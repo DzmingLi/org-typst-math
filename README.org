@@ -200,6 +200,9 @@ Entering a formula reveals its source; leaving it restores the image, requesting
 a new SVG when needed. =org-fragtog-plus-delay= sets the idle delay before
 revealing source, in seconds (default 0). Set =org-typst-math-preview-scale=
 to adjust image size.
+Inline images reserve extra vertical space using
+=org-typst-math-preview-inline-padding= (default 6 pixels). SVG bounds include
+the full formula, so fractions and scripts can expand the line height.
 
 Editing a formula invalidates its image immediately. Manual preview remains
 available without org-fragtog-plus. Disabling automatic toggling clears the

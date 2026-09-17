@@ -11,6 +11,10 @@
   "Scale of SVG preview images."
   :type 'number :group 'org-typst-math)
 
+(defcustom org-typst-math-preview-inline-padding 6
+  "Extra vertical space in pixels for inline formula images."
+  :type 'natnum :group 'org-typst-math)
+
 (defvar-local org-typst-math-preview--overlays nil)
 (defvar-local org-typst-math-preview--generation 0)
 (defvar-local org-typst-math-preview--pending nil)
@@ -56,7 +60,10 @@
                 (overlay (make-overlay start end nil nil t)))
            (overlay-put overlay 'org-typst-image
                         (create-image svg 'svg t :ascent 'center
-                                      :scale org-typst-math-preview-scale))
+                                      :scale org-typst-math-preview-scale
+                                      :margin (cons 0 (if (eq (plist-get fragment :display) t)
+                                                          0
+                                                        (ceiling (/ org-typst-math-preview-inline-padding 2.0))))))
            (overlay-put overlay 'evaporate t)
            (overlay-put overlay 'modification-hooks '(org-typst-math-preview--modified))
            (push overlay org-typst-math-preview--overlays)))

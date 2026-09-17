@@ -82,7 +82,7 @@ impl Engine {
             .iter()
             .map(|item| {
                 let layout = if batch.target == Target::Svg {
-                    format!("#set page(width: auto, height: auto, margin: 2pt, fill: none)\n#set text(size: 12pt, fill: rgb({}))\n",
+                    format!("#set page(width: auto, height: auto, margin: 2pt, fill: none)\n#set text(size: 12pt, top-edge: \"bounds\", bottom-edge: \"bounds\", fill: rgb({}))\n",
                         serde_json::to_string(item.foreground.as_deref().unwrap_or("#000000")).unwrap())
                 } else { String::new() };
                 let prefix = format!(
