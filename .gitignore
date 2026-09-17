@@ -2,6 +2,7 @@
 /work/
 *.elc
 /result
+/result-elisp
 /.direnv/
 
 # Local verification files are not part of the published repository.

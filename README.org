@@ -10,7 +10,7 @@
 git clone https://github.com/DzmingLi/org-typst-math.git
 cd org-typst-math
 nix profile install .
-nix develop --command python3 scripts/package.py
+nix build .#elisp --out-link result-elisp
 #+end_src
 
 =Nix profile= 安装 Rust helper；Elisp 包通过下文的 =package-install-file= 安装。
@@ -75,10 +75,10 @@ sum_(k=1)^n k = (n(n+1))/2
 也可生成三个独立的安装包（org-fragtog-plus 为可选包）：
 
 #+begin_src sh
-python3 scripts/package.py
+nix build .#elisp --out-link result-elisp
 #+end_src
 
-在 Emacs 中用 =M-x package-install-file= 依次安装 =work/packages/= 内的
+在 Emacs 中用 =M-x package-install-file= 依次安装 =result-elisp/= 内的
 =typst-client-0.1.0.tar= 和 =org-typst-math-0.1.0.tar=，再配置 helper 路径并
 =(require 'org-typst-math)=。自动切换另安装 =org-fragtog-plus-0.1.0.tar=。Rust helper 单独构建，不包含在 Elisp archive 中。
 

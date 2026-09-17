@@ -12,7 +12,7 @@
 - 使用开发环境中的 ox-typst；其他版本的 ox-typst 未验证。
 
 为避免依赖 Org 的间接加载，在 org-fragtog-plus 中补上 org-element、subr-x 和 seq 的显式 require。
-包头和打包脚本统一声明 Emacs 30.2；依赖 Org 的包声明 Org 9.7.11。更低的候选版本不作为安装下限。
+包头声明 Emacs 30.2；依赖 Org 的包声明 Org 9.7.11。Nix 打包直接读取包头，更低的候选版本不作为安装下限。
 
 * 源码边界（不是已验证的最低支持版本）
 

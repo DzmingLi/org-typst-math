@@ -21,6 +21,25 @@
             cargoLock.lockFile = ./Cargo.lock;
             doCheck = false;
           };
+          elisp = pkgs.runCommand "org-typst-elisp-packages" {
+            nativeBuildInputs = [ pkgs.gnutar ];
+          } ''
+            mkdir -p "$out"
+            for name in typst-client org-typst-math org-fragtog-plus; do
+              source=${./lisp}/$name.el
+              version=$(sed -n 's/^;; Version: //p' "$source")
+              dependencies=$(sed -n 's/^;; Package-Requires: //p' "$source")
+              directory="$name-$version"
+              mkdir "$directory"
+              cp ${./lisp}/$name*.el "$directory/"
+              cat > "$directory/$name-pkg.el" <<EOF
+            ;;; -*- no-byte-compile: t; lexical-binding: t; -*-
+            (define-package "$name" "$version" "$name" '$dependencies)
+            EOF
+              tar --sort=name --mtime=@1 --owner=0 --group=0 --numeric-owner \
+                -cf "$out/$directory.tar" "$directory"
+            done
+          '';
         });
       devShells = forAllSystems (system:
         let pkgs = import nixpkgs { inherit system; };
@@ -29,7 +48,7 @@
             packages = with pkgs; [
               cargo rustc rustfmt clippy
               ((emacsPackagesFor emacs).emacsWithPackages (epkgs: [ epkgs.ox-typst ]))
-              typst python3 git
+              typst git
             ];
             shellHook = ''
               export PATH="$PWD/target/debug:$PATH"
