@@ -92,10 +92,10 @@ Load ox-typst before using the derived Typst exporter.
 |-------------------+-------+--------------|
 | Internal client module | lisp/typst-client.el | Included in org-typst-math |
 | org-typst-math | lisp/org-typst-math.el, lisp/org-typst-math-export.el | Org, Emacs jsonrpc |
-| org-fragtog-plus | lisp/org-fragtog-plus.el | Org, Emacs 30.2+ |
+
 | Built-in preview module | lisp/org-typst-math-preview.el | Included in org-typst-math |
 
-Build two independently installable archives; org-fragtog-plus is optional:
+Build the org-typst-math archive:
 
 #+begin_src sh
 nix build .#elisp --out-link result-elisp
@@ -103,14 +103,13 @@ nix build .#elisp --out-link result-elisp
 
 Use =M-x package-install-file= to install =org-typst-math-0.1.0.tar=
 from =result-elisp/=. Configure the helper path if
-needed, then evaluate =(require 'org-typst-math)=. Install
-=org-fragtog-plus-0.1.0.tar= for automatic preview toggling.
+needed, then evaluate =(require 'org-typst-math)=. For automatic preview toggling, install
+[[https://github.com/DzmingLi/org-fragtog-plus][org-fragtog-plus]] from its separate repository.
 The Rust helper is built separately and is not included in the Elisp archives.
 
 For package managers that select source files, include =lisp/org-typst-math*.el=
 and =lisp/typst-client.el= in org-typst-math. The client, export, and preview
-modules are internal parts of this package. The optional toggling package
-consists of =lisp/org-fragtog-plus.el=.
+modules are internal parts of this package. The optional toggling package is maintained in its own repository.
 
 The client reuses one connection per document directory. Each HTML/LaTeX
 export collects all math fragments into one batch JSON-RPC request. Rust retains
@@ -183,7 +182,7 @@ is revealed.
   explicitly refresh or clear previews.
 - =M-x org-typst-math-preview-diagnostics=: view errors and their locations.
 
-org-fragtog-plus is an independent, optional package. It uses Org's built-in
+[[https://github.com/DzmingLi/org-fragtog-plus][org-fragtog-plus]] is an independent, optional package in a separate repository. It uses Org's built-in
 LaTeX preview by default. Enabling org-typst-math-mode selects the buffer-local
 Typst backend; disabling it restores LaTeX.
 It neither depends on nor advises the original org-fragtog package.

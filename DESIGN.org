@@ -124,7 +124,7 @@ org-typst-math-preview.el 随核心包安装，提供 org-typst-preview
 
 ** org-fragtog-plus
 
-同一仓库提供独立 org-fragtog-plus 包，支持 Emacs 30.2+，不依赖或 advice 原 org-fragtog。
+独立仓库提供 org-fragtog-plus 包，支持 Emacs 30.2+，不依赖或 advice 原 org-fragtog。
 它负责光标检测、空闲延迟、片段跟踪和生命周期清理；backend 负责 fragment/show/hide/clear。
 默认 backend 调用 Org 内置 LaTeX 预览，Typst adapter 位于 org-typst-math-preview.el。
 org-typst-math-mode 启用时选择 buffer-local Typst backend，关闭时恢复 LaTeX。
