@@ -7,9 +7,9 @@
 (require 'org-typst-math)
 (require 'color)
 
-(defcustom org-typst-math-preview-scale 1.2
-  "Scale of SVG preview images."
-  :type 'number :group 'org-typst-math)
+(defun org-typst-math-preview--scale ()
+  "Scale the helper's 12pt output to Emacs's default face size."
+  (/ (face-attribute 'default :height nil 'default) 120.0))
 
 (defcustom org-typst-math-preview-inline-padding 6
   "Extra vertical space in pixels for inline formula images."
@@ -65,7 +65,7 @@
                 (overlay (make-overlay start end nil nil t)))
            (overlay-put overlay 'org-typst-image
                         (create-image svg 'svg t :ascent 'center
-                                      :scale org-typst-math-preview-scale
+                                      :scale (org-typst-math-preview--scale)
                                       :margin (cons 0 (if (eq (plist-get fragment :display) t)
                                                           0
                                                         (ceiling (/ org-typst-math-preview-inline-padding 2.0))))))
