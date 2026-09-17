@@ -1,0 +1,33 @@
+#+TITLE: 版本兼容性核对
+
+* 实测结果
+
+2026-09-17：Emacs 30.2，自带 Org 9.7.11。
+
+- 三个包的全部 Elisp 文件严格字节编译通过。
+- 24 项批处理测试通过：导出、helper 调用、backend 切换、延迟及清理。
+- 7 项图形预览测试通过，包含真实 Typst SVG 图片显示。
+- 使用独立目录复制源码并在 Emacs 30.2 下重新编译，未复用 Emacs 31 字节码。
+- LaTeX 自动切换 backend 测试使用替身验证 Org 接口调用，未实跑 LaTeX 图片生成。
+- 使用开发环境中的 ox-typst；其他版本的 ox-typst 未验证。
+
+为避免依赖 Org 的间接加载，在 org-fragtog-plus 中补上 org-element、subr-x 和 seq 的显式 require。
+包头和打包脚本统一声明 Emacs 30.2；依赖 Org 的包声明 Org 9.7.11。更低的候选版本不作为安装下限。
+
+* 源码边界（不是已验证的最低支持版本）
+
+| 包 | 候选版本 | 依据 |
+| org-fragtog-plus | Emacs 26.1 + Org 9.3 | when-let* 已在 26.1 的 subr-x；9.3 有 org-latex-preview 和 org-clear-latex-preview |
+| typst-client | Emacs 27.1 | 内置 jsonrpc 提供 process connection、同步/异步请求及 timeout-fn |
+| org-typst-math | Emacs 27.1 + Org 9.7 | 客户端依赖；org-element-type-p 在 9.7 的 org-element-ast 中提供 |
+
+Org 9.6 没有 org-element-type-p，不能仅降低元数据就宣称支持。
+Emacs 26–29 尚未运行完整测试；候选版本需要进一步测试才能成为安装依赖下限。
+开发 flake 继续使用 Emacs 31。
+
+* 核对来源
+
+- [[https://github.com/emacs-mirror/emacs/blob/emacs-26.1/lisp/emacs-lisp/subr-x.el][Emacs 26.1 subr-x]]
+- [[https://github.com/emacs-mirror/emacs/blob/emacs-27.1/lisp/jsonrpc.el][Emacs 27.1 jsonrpc]]
+- [[https://github.com/bzg/org-mode/blob/release_9.3/lisp/org.el][Org 9.3 预览接口]]
+- [[https://github.com/bzg/org-mode/blob/release_9.7/lisp/org-element-ast.el][Org 9.7 AST 接口]]

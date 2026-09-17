@@ -1,0 +1,38 @@
+#+TITLE: Mathematical environments
+#+TYPST_MATH: t
+#+TYPST_HEADER: #let sq(x) = $#x^2$
+#+LATEX_HEADER: \usepackage{amsthm}
+#+LATEX_HEADER: \newtheorem{theorem}{Theorem}
+#+LATEX_HEADER: \newtheorem{example}{Example}
+#+OPTIONS: toc:nil
+
+#+begin_export typst
+#import "@preview/theorion:0.6.0": *
+#import cosmos.simple: *
+#show: show-theorion
+#+end_export
+
+* Statements
+
+#+NAME: square
+#+ATTR_TYPST: :title [Nonnegative squares]
+#+ATTR_LATEX: :options [Nonnegative squares]
+#+begin_typst-theorem
+For real $x$, we have $sq(x) >= 0$.
+#+end_typst-theorem
+
+#+begin_typst-proof
+A square is nonnegative.
+#+end_typst-proof
+
+#+ATTR_TYPST: :positional [A concrete case]
+#+ATTR_LATEX: :options [A concrete case]
+#+begin_typst-example
+For example, $sq(2) = 4$.
+#+end_typst-example
+
+See [[square][the statement above]].
+
+#+begin_example
+This is still an ordinary Org example block: $unknown$.
+#+end_example

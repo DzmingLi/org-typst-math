@@ -1,0 +1,132 @@
+#+TITLE: org-typst-math 设计文档
+#+LANGUAGE: zh-CN
+
+* 状态与核心决策
+
+这份文档只记录我确定的一些决策，剩下的技术决策都可能是之后改变的，现在主要是让AI快速出MVP。
+
+本项目让 Org 文档中的数学内容使用 Typst math syntax，并接入 Org 编辑、预览与导出工作流。
+接入会改变ox-typst（如果你安装了），ox-html，ox-latex，
+
+直接采用ox-typst提供的  =TYPST_HEADER= 作为preamble语法，它会改变数学宏。
+
+采用 Emacs Lisp frontend + 常驻 Rust subprocess。Elisp 管理 Org 结构与用户交互，Rust
+复用现有库完成转换。
+
+
+| 路径         | 职责                         | 默认实现方向                         |
+|--------------+------------------------------+--------------------------------------|
+| 编辑与识别   | Org 数学区域、位置和生命周期 | buffer-local minor mode + Org adapter |
+| Preview      | Typst → SVG                  | 官方 Typst 编译与 SVG crates          |
+| HTML export  | Typst → MathML               | 官方 HTML 编译路径                   |
+| LaTeX export | Typst → LaTeX                | 可插拔 Rust backend，优先评估 tylax   |
+| 通信         | 异步请求、批量转换、诊断     | stdio JSON-RPC 2.0                    |
+
+最低支持已实测的 Emacs 30.2 和 Org 9.7.11，不引入旧版兼容层；开发环境继续使用 Emacs 31。
+
+第一版包含：显式启用的 Typst 数学语义、行内及独立公式、派生 HTML/
+typst/latex exporter。
+
+SVG preview 内置在 org-typst-math 包中，代码分文件，通过 org-typst-preview 命令调用。源码高亮留作后续功能。
+
+不要做太多的防护，我们永远默认用户在数学界内输入的都是正常的数学符号和定义好的宏，
+
+* 用户模型与源语法
+** 显式启用与覆盖范围
+
+建议文件声明 =#+TYPST_MATH: t= ，提供 =org-typst-math-mode= 。
+文件声明供导出识别，minor mode 控制当前 buffer 的编辑与预览。导出仍以文件声明及显式导出选项为准。
+
+启用后，受支持数学分隔符内的内容一律解释为 Typst。
+
+Org 容器，Typst 数学正文
+
+采用和 Org 完全一样的数学容器：=$...$=、=\(...\)= 为行内；=$$...$$=、=\[...\]= 为独立公式。
+只不过剥除容器后，内部内容以 Typst math mode 解析。
+
+
+#+begin_example
+#+TYPST_MATH: t
+
+行内公式 $alpha + beta = gamma$，或者 \(frac(a, b)\)。
+
+\[
+sum_(k=1)^n k = (n(n+1))/2
+\]
+#+end_example
+
+这覆盖的是数学正文的语言，不宣称 Org 原生接受完整 Typst delimiter grammar。
+尤其 =$ x^2 $= ；。Org 对 dollar 边界及换行的限制仍有效。
+
+
+补全和源码编辑模式为后续功能。
+
+* 通用 special block 导出
+
+已实现。=org-typst-math-block-alist= 是默认值为 =nil= 的 defcustom alist，
+由用户配置 Org special block 名到目标环境名的映射。只有表中的块参与转换，
+不预置环境，不自动去前缀。内置原样文本 example 块不受影响。
+
+#+begin_src emacs-lisp
+(setq org-typst-math-block-alist
+      '(("typst-theorem" . "theorem")
+        ("typst-example" . "example")
+        ("typst-proof" . "proof")))
+#+end_src
+
+Typst 导出为同名函数调用；LaTeX 使用映射后的环境名；HTML 使用映射后的
+块类型作为 class。正文仍按 Org 处理，公式继续走现有数学流程。
+导出启用条件沿用 TYPST_MATH 或显式派生 backend。
+
+** Typst 参数透传
+
+ATTR_TYPST 中只有 =:positional= 是特殊键，表示位置参数；其余键全部按原名
+生成 Typst 命名参数。值直接写 Typst 表达式，保留字符串引号、内容括号、
+布尔值、数字及函数调用。不推断类型，不提供 title-arg 或 label-style 等映射配置。
+支持多行 ATTR_TYPST 和重复的位置参数，参数按源码顺序输出。
+
+#+begin_example
+#+ATTR_TYPST: :positional [标题] :supplement [定理] :numbering none
+#+begin_typst-theorem
+正文。
+#+end_typst-theorem
+#+end_example
+
+生成 =#theorem([标题], supplement: [定理], numbering: none)[正文]=。
+用户按所选包直接写 =:title [标题]=、=:name [标题]= 或 =:of [标题]= 等。
+
+NAME 提供 Org 引用目标，默认用 Org 导出 reference 生成后置 Typst 标签，
+与 Org 链接保持一致。需要标签参数的包直接用 =:label <thm:foo>=；此时不再
+生成后置标签，指向该块的 Org 链接使用传入的标签表达式。
+
+** 配置与后端职责
+
+函数定义、定理包导入、样式和计数器由用户 preamble 负责，不增加包白名单
+或支持范围校验。整份文档的 Typst 初始化可以放在文首的 =begin_export typst=
+中；它不会送进公式 helper。TYPST_HEADER 继续用于共享数学宏。
+
+ATTR_TYPST 仅用于 Typst；LaTeX、HTML 各自沿用 ATTR_LATEX、ATTR_HTML。
+HTML 定理编号和跨后端标题自动同步尚未实现。
+
+* 内置 SVG 预览
+
+Rust helper 的 math/convert 新增 svg target，通过官方 typst-layout 与 typst-svg
+直接生成透明 SVG，复用字体库与编译缓存。批量请求通过现有 typst-client 异步入口发送，
+不启动 Typst CLI。每个公式的前景色随请求传入，大小通过 Emacs image scale 调整。
+
+org-typst-math-preview.el 随核心包安装，提供 org-typst-preview
+及手动 refresh、clear、diagnostics 命令，无需额外的预览 mode；编辑后 overlay 失效。
+未完成的请求合并后续刷新意图；buffer 修改 tick 与 generation 防止过期结果覆盖源码。
+清除预览或禁用适配时使未返回请求失效，关闭 buffer 时清理 overlay。
+
+第一版预览数学片段，读取当前 buffer 的 TYPST_HEADER；定理块整体预览、浮窗和
+可见区域调度不在本次实现中。公式诊断沿用现有位置映射，但自动刷新不弹出错误窗口。
+
+** org-fragtog-plus
+
+同一仓库提供独立 org-fragtog-plus 包，支持 Emacs 30.2+，不依赖或 advice 原 org-fragtog。
+它负责光标检测、空闲延迟、片段跟踪和生命周期清理；backend 负责 fragment/show/hide/clear。
+默认 backend 调用 Org 内置 LaTeX 预览，Typst adapter 位于 org-typst-math-preview.el。
+org-typst-math-mode 启用时选择 buffer-local Typst backend，关闭时恢复 LaTeX。
+backend 切换、mode 关闭和 buffer 关闭时取消定时器并清理对应预览。
+手动 org-typst-preview 不需要开启自动切换 mode，前缀参数清除预览。

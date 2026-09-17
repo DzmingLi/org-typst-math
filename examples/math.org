@@ -1,0 +1,26 @@
+#+TITLE: Typst mathematics in Org
+#+TYPST_MATH: t
+#+TYPST_HEADER: #let vect(x) = math.bold(x)
+#+TYPST_HEADER: #let sq(x) = $#x^2$
+#+TYPST_HEADER: #let reals = sym.RR
+#+OPTIONS: toc:nil
+
+* Inline and display math
+
+An inline fraction $frac(a, b)$ and a vector \(vect(v)\).
+A parameterized macro $sq(a+b)$ and an alias $reals$.
+
+\[
+sum_(k=1)^n k = (n(n+1))/2
+\]
+
+$$mat(1, 2; 3, 4)$$
+
+* Ordinary Org content
+
+- Emphasis, links and lists still use Org's exporters.
+- The same =TYPST_HEADER= defines macros for HTML, LaTeX and Typst export.
+
+#+begin_src text
+$this_is_ordinary_source_code$
+#+end_src

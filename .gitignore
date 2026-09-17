@@ -1,0 +1,8 @@
+/target/
+/work/
+*.elc
+/result
+/.direnv/
+
+# Local verification files are not part of the published repository.
+/tests/
