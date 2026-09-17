@@ -53,8 +53,7 @@ session, adjust these paths:
 (require 'ox-typst nil t)  ; Optional: whole-document Typst/PDF export only.
 #+end_src
 
-HTML export needs only the compiled helper and the typst-client and
-org-typst-math Elisp packages. It does not require the Typst CLI or ox-typst.
+HTML export needs only the compiled helper and the org-typst-math Elisp package. It does not require the Typst CLI or ox-typst.
 Use =cargo build --release= for an optimized helper, then update
 =typst-client-command= accordingly.
 
@@ -91,26 +90,26 @@ Load ox-typst before using the derived Typst exporter.
 
 | Package or module | Files | Dependencies |
 |-------------------+-------+--------------|
-| typst-client | lisp/typst-client.el | Emacs jsonrpc |
-| org-typst-math | lisp/org-typst-math.el, lisp/org-typst-math-export.el | typst-client, Org |
+| Internal client module | lisp/typst-client.el | Included in org-typst-math |
+| org-typst-math | lisp/org-typst-math.el, lisp/org-typst-math-export.el | Org, Emacs jsonrpc |
 | org-fragtog-plus | lisp/org-fragtog-plus.el | Org, Emacs 30.2+ |
 | Built-in preview module | lisp/org-typst-math-preview.el | Included in org-typst-math |
 
-Build three independently installable archives; org-fragtog-plus is optional:
+Build two independently installable archives; org-fragtog-plus is optional:
 
 #+begin_src sh
 nix build .#elisp --out-link result-elisp
 #+end_src
 
-Use =M-x package-install-file= to install =typst-client-0.1.0.tar= followed by
-=org-typst-math-0.1.0.tar= from =result-elisp/=. Configure the helper path if
+Use =M-x package-install-file= to install =org-typst-math-0.1.0.tar=
+from =result-elisp/=. Configure the helper path if
 needed, then evaluate =(require 'org-typst-math)=. Install
 =org-fragtog-plus-0.1.0.tar= for automatic preview toggling.
 The Rust helper is built separately and is not included in the Elisp archives.
 
-For package managers that select source files, use =lisp/typst-client.el= for
-the client and =lisp/org-typst-math*.el= for the math package. Both export and
-preview modules belong to the math package. The optional toggling package
+For package managers that select source files, include =lisp/org-typst-math*.el=
+and =lisp/typst-client.el= in org-typst-math. The client, export, and preview
+modules are internal parts of this package. The optional toggling package
 consists of =lisp/org-fragtog-plus.el=.
 
 The client reuses one connection per document directory. Each HTML/LaTeX

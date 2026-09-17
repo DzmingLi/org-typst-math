@@ -1,7 +1,7 @@
 ;;; org-typst-math.el --- Typst mathematics in Org -*- lexical-binding: t; -*-
 
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "30.2") (org "9.7.11") (typst-client "0.1.0"))
+;; Package-Requires: ((emacs "30.2") (org "9.7.11"))
 ;; Keywords: outlines, tex
 
 ;;; Commentary:

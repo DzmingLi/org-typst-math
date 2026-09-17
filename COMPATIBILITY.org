@@ -4,7 +4,7 @@
 
 2026-09-17：Emacs 30.2，自带 Org 9.7.11。
 
-- 三个包的全部 Elisp 文件严格字节编译通过。
+- 全部 Elisp 文件严格字节编译通过。
 - 24 项批处理测试通过：导出、helper 调用、backend 切换、延迟及清理。
 - 7 项图形预览测试通过，包含真实 Typst SVG 图片显示。
 - 使用独立目录复制源码并在 Emacs 30.2 下重新编译，未复用 Emacs 31 字节码。
@@ -18,7 +18,7 @@
 
 | 包 | 候选版本 | 依据 |
 | org-fragtog-plus | Emacs 26.1 + Org 9.3 | when-let* 已在 26.1 的 subr-x；9.3 有 org-latex-preview 和 org-clear-latex-preview |
-| typst-client | Emacs 27.1 | 内置 jsonrpc 提供 process connection、同步/异步请求及 timeout-fn |
+| typst-client（内部模块） | Emacs 27.1 | 内置 jsonrpc 提供 process connection、同步/异步请求及 timeout-fn |
 | org-typst-math | Emacs 27.1 + Org 9.7 | 客户端依赖；org-element-type-p 在 9.7 的 org-element-ast 中提供 |
 
 Org 9.6 没有 org-element-type-p，不能仅降低元数据就宣称支持。

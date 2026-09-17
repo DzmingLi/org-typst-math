@@ -1,10 +1,9 @@
 ;;; typst-client.el --- Persistent Typst conversion service -*- lexical-binding: t; -*-
 
-;; Version: 0.1.0
-;; Package-Requires: ((emacs "30.2"))
 ;; Keywords: processes, tex
 
 ;;; Commentary:
+;; Internal module of org-typst-math, not a separate package.
 ;; Shared stdio JSON-RPC client.  A connection is reused per document directory.
 ;; No Org or preview dependencies belong here.
 
