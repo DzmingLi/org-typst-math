@@ -1,10 +1,12 @@
 #+TITLE: org-typst-math
 #+OPTIONS: toc:nil
 
-在 Org 数学容器内使用 Typst 数学语法，通过常驻 Rust helper 导出 MathML 或 LaTeX，或交给
-社区 ox-typst 导出整份 Typst 文档。支持 Emacs 30.2+ 和 Org 9.7.11+，不引入旧版兼容层。
+Write Typst math inside Org's math delimiters. A persistent Rust helper converts
+formulas to SVG previews, MathML for HTML export, or LaTeX. The community
+ox-typst exporter handles whole-document Typst export.
+Requires Emacs 30.2+ and Org 9.7.11+; no compatibility layer is included.
 
-* 安装
+* Installation
 
 #+begin_src sh
 git clone https://github.com/DzmingLi/org-typst-math.git
@@ -13,87 +15,117 @@ nix profile install .
 nix build .#elisp --out-link result-elisp
 #+end_src
 
-=Nix profile= 安装 Rust helper；Elisp 包通过下文的 =package-install-file= 安装。
-helper 位于 PATH 时无需设置 =typst-client-command=。
-也可用 =nix build= 构建 helper，或在开发 shell 中执行 =cargo build=。
+The profile installation provides the Rust helper. Install the Elisp archives
+with =package-install-file= as described below. When the helper is on Emacs's
+PATH, there is no need to set =typst-client-command=.
+You can also build the helper with =nix build=, or run =cargo build= in the
+development shell.
 
-* 开发环境与运行
+* Development environment and usage
 
-项目环境由 =flake.nix= 提供，版本固定在 =flake.lock=。其中包含 Rust 工具链、Emacs 31、
-Org、ox-typst 和 Typst CLI；LaTeX PDF 导出需自行安装 TeX。helper 本身直接链接 Typst Rust 库，不调用 CLI。
+=flake.nix= provides the development environment, pinned by =flake.lock=.
+It includes the Rust toolchain, Emacs 31, Org, ox-typst, and the Typst CLI.
+Install TeX separately for LaTeX-to-PDF export. The helper links directly to
+Typst's Rust libraries and does not invoke the CLI.
 
+Use the standard Org export menu in an example buffer:
 
-在示例 buffer 中使用普通 Org 导出菜单：=C-c C-e h h= 导出 HTML，=C-c C-e y f= 导出
-Typst，=C-c C-e l l= 导出 LaTeX，=C-c C-e l p= 经 LaTeX 编译为 PDF，=C-c C-e y p= 经 ox-typst 编译为 PDF。只有带 =TYPST_MATH: t= 声明的文档才会
-自动选择本包的派生 exporter；其他文档保持原行为。
+| Keys          | Output                  |
+|---------------+-------------------------|
+| =C-c C-e h h= | HTML                    |
+| =C-c C-e y f= | Typst                   |
+| =C-c C-e l l= | LaTeX                   |
+| =C-c C-e l p= | PDF through LaTeX       |
+| =C-c C-e y p= | PDF through ox-typst    |
 
-开发 shell 将当前项目的 =target/debug= 加入 PATH。在已有 Emacs 会话里手动加载时：
+Documents declaring =TYPST_MATH: t= automatically use this package's derived
+exporters. Other documents retain their usual export behavior.
+
+Enter the development shell with =nix develop=. It adds the project's
+=target/debug= directory to PATH. To load a checkout in an existing Emacs
+session, adjust these paths:
 
 #+begin_src emacs-lisp
 (add-to-list 'load-path (expand-file-name "~/src/org-typst-math/lisp"))
 (setq typst-client-command
       (list (expand-file-name "~/src/org-typst-math/target/debug/org-typst-math-helper")))
 (require 'org-typst-math)
-(require 'ox-typst nil t)  ; 可选，仅整份 Typst/PDF 导出需要
+(require 'ox-typst nil t)  ; Optional: whole-document Typst/PDF export only.
 #+end_src
 
-无需为了 HTML 导出安装 Typst CLI 或 ox-typst。只需已编译的 helper 和这两个 Elisp 包。
-后续可用 =cargo build --release= 构建优化后的 helper，并调整 =typst-client-command=。
+HTML export needs only the compiled helper and the typst-client and
+org-typst-math Elisp packages. It does not require the Typst CLI or ox-typst.
+Use =cargo build --release= for an optimized helper, then update
+=typst-client-command= accordingly.
 
-* 文档语法
+* Document syntax
 
 #+begin_example
 #+TYPST_MATH: t
 #+TYPST_HEADER: #let vect(x) = math.bold(x)
 #+TYPST_HEADER: #import "math-defs.typ": *
 
-行内 $vect(v)$，或者 \(frac(a, b)\)。
+Inline $vect(v)$, or \(frac(a, b)\).
 
 \[
 sum_(k=1)^n k = (n(n+1))/2
 \]
 #+end_example
 
-删去示例中不需要的 import，或提供相应文件。多个 =TYPST_HEADER= 按顺序拼接。
-本地 import 相对于 Org 文档目录解析；每次 HTML/LaTeX 导出会重新读取依赖。
-=$...$= 和 =\(...\)= 为行内，=$$...$$= 和 =\[...\]= 为独立公式。
-识别范围完全沿用 Org，源代码块和原样文本不会被扫描为数学。
+Provide the imported file or remove the import from this example.
+Multiple =TYPST_HEADER= entries are concatenated in order. Local imports resolve
+relative to the Org document's directory; dependencies are reread on each
+HTML/LaTeX export.
 
-=org-typst-math-mode= 是编辑端开关，不修改文件；导出以文件声明或
-=org-export-as= 的 =:typst-math t= 选项为准。直接选择 =typst-math-html= 或
-=typst-math-latex= 或 =typst-math-typst= 后端也可以明确启用。派生 Typst 后端须先加载 ox-typst。
+=$...$= and =\(...\)= contain inline math; =$$...$$= and =\[...\]= contain
+display math. Recognition follows Org's parser, so source blocks and verbatim
+text are not scanned as math.
 
-* 包与进程
+=org-typst-math-mode= controls editing behavior without modifying the file.
+Export uses the document declaration or the =:typst-math t= option passed to
+=org-export-as=. Selecting =typst-math-html=, =typst-math-latex=, or
+=typst-math-typst= explicitly also enables the corresponding exporter.
+Load ox-typst before using the derived Typst exporter.
 
-| 包                    | 文件                                                     | 依赖           |
-|-----------------------+----------------------------------------------------------+----------------|
-| typst-client          | lisp/typst-client.el                                     | Emacs jsonrpc  |
-| org-typst-math         | lisp/org-typst-math.el、lisp/org-typst-math-export.el      | typst-client、Org |
-| org-fragtog-plus      | lisp/org-fragtog-plus.el                                | Org，Emacs 30.2+ |
-| 内置预览模块          | lisp/org-typst-math-preview.el                           | 随核心包安装   |
+* Packages and processes
 
-也可生成三个独立的安装包（org-fragtog-plus 为可选包）：
+| Package or module | Files | Dependencies |
+|-------------------+-------+--------------|
+| typst-client | lisp/typst-client.el | Emacs jsonrpc |
+| org-typst-math | lisp/org-typst-math.el, lisp/org-typst-math-export.el | typst-client, Org |
+| org-fragtog-plus | lisp/org-fragtog-plus.el | Org, Emacs 30.2+ |
+| Built-in preview module | lisp/org-typst-math-preview.el | Included in org-typst-math |
+
+Build three independently installable archives; org-fragtog-plus is optional:
 
 #+begin_src sh
 nix build .#elisp --out-link result-elisp
 #+end_src
 
-在 Emacs 中用 =M-x package-install-file= 依次安装 =result-elisp/= 内的
-=typst-client-0.1.0.tar= 和 =org-typst-math-0.1.0.tar=，再配置 helper 路径并
-=(require 'org-typst-math)=。自动切换另安装 =org-fragtog-plus-0.1.0.tar=。Rust helper 单独构建，不包含在 Elisp archive 中。
+Use =M-x package-install-file= to install =typst-client-0.1.0.tar= followed by
+=org-typst-math-0.1.0.tar= from =result-elisp/=. Configure the helper path if
+needed, then evaluate =(require 'org-typst-math)=. Install
+=org-fragtog-plus-0.1.0.tar= for automatic preview toggling.
+The Rust helper is built separately and is not included in the Elisp archives.
 
-两个现有包的包管理器文件选择应分别为
-=lisp/typst-client.el= 与 =lisp/org-typst-math*.el=；export 和 preview 文件都属于核心包的内部模块。
+For package managers that select source files, use =lisp/typst-client.el= for
+the client and =lisp/org-typst-math*.el= for the math package. Both export and
+preview modules belong to the math package. The optional toggling package
+consists of =lisp/org-fragtog-plus.el=.
 
-客户端按文档目录复用连接。每次 HTML/LaTeX 导出收集全部数学片段，发出一次批量 JSON-RPC 请求。
-Rust 保留字体库和 Typst 编译缓存；没有磁盘结果缓存或每公式进程。
-Typst 导出只传递数学源码与 header，不需要 helper。=M-x typst-client-stop= 关闭已有进程，
-后续请求自动重启。客户端也提供异步转换入口，供内置预览使用。
+The client reuses one connection per document directory. Each HTML/LaTeX
+export collects all math fragments into one batch JSON-RPC request. Rust retains
+the font database and Typst compilation cache; there is no disk result cache
+or separate process per formula.
 
+Typst export passes through math source and headers without using the helper.
+=M-x typst-client-stop= closes existing processes; subsequent requests restart
+them automatically. The client also provides asynchronous conversion for previews.
 
-* 数学环境与自定义块
+* Math environments and custom blocks
 
-用 =M-x customize-variable RET org-typst-math-block-alist= 配置别名，或：
+Configure aliases with =M-x customize-variable RET org-typst-math-block-alist=,
+or set them directly:
 
 #+begin_src emacs-lisp
 (setq org-typst-math-block-alist
@@ -102,8 +134,9 @@ Typst 导出只传递数学源码与 header，不需要 helper。=M-x typst-clie
         ("typst-proof" . "proof")))
 #+end_src
 
-默认表为空；只有配置的 special block 参与转换。可映射任意自定义环境名。
-没有自动前缀规则，普通 =begin_example= 仍是原样文本块。
+The default mapping is empty. Only configured special blocks are converted,
+and arbitrary environment names can be mapped. There is no automatic prefix
+rule. The standard =begin_example= block remains a verbatim example block.
 
 #+begin_example
 #+NAME: my-theorem
@@ -116,57 +149,75 @@ For real $x$, $x^2 >= 0$.
 See [[my-theorem][the theorem]].
 #+end_example
 
-Typst 生成 =#theorem(title: [A theorem], numbering: none)[...]=。
-=:positional= 传位置参数，其余键原名传递；参数值是原始 Typst 表达式，
-例如 =:name "Title"=、=:positional [Title]=、=:outlined false=、=:fill rgb("#fff")=。
-可重复写位置参数或分多行 ATTR_TYPST。NAME 默认生成与 Org 链接一致的后置标签；
-需要标签参数时写 =:label <thm:one>=，保留 NAME 作为 Org 链接目标。
+Typst output is =#theorem(title: [A theorem], numbering: none)[...]=.
+=:positional= supplies positional arguments; all other keys retain their names.
+Values are raw Typst expressions, such as =:name "Title"=,
+=:positional [Title]=, =:outlined false=, or =:fill rgb("#fff")=.
+Positional arguments can be repeated, and attributes can span multiple
+ATTR_TYPST lines.
 
-LaTeX 使用映射后的环境名和 ATTR_LATEX，HTML 使用映射后的 class 和 ATTR_HTML。
-Typst 的任意参数不会转成 HTML 或 LaTeX 参数；HTML 不自动生成定理编号。
+By default, NAME produces a trailing label matching Org links. To pass a label
+as an argument instead, use =:label <thm:one>= while keeping NAME as the Org
+link target.
 
-完整示例见 [[file:examples/blocks.org][blocks.org]]，其中 theorion 初始化放在文首
-=begin_export typst= 中，只用于整份 Typst 文档，不进入数学 helper。
-使用上面的别名配置后，可按普通 Org 菜单导出这份示例。数学宏仍放在 TYPST_HEADER。
+LaTeX uses the mapped environment name and ATTR_LATEX; HTML uses the mapped
+class and ATTR_HTML. Typst arguments are not translated into HTML or LaTeX
+attributes. HTML theorem numbering is not generated automatically.
 
+See [[file:examples/blocks.org][blocks.org]] for a complete example. Its theorion setup lives in a
+=begin_export typst= block at the top of the document. This setup applies only
+to whole-document Typst export and is not passed to the math helper.
+After configuring the aliases above, export the example through the standard
+Org menu. Math macros still belong in TYPST_HEADER.
 
+* Built-in previews and org-fragtog-plus
 
-* 内置公式预览与 org-fragtog-plus
+Previews are included in org-typst-math and share the persistent helper with
+export. They require graphical Emacs 30.2+ with SVG support.
 
-预览随 org-typst-math 安装，与导出共用常驻 helper。需要带 SVG 支持的图形 Emacs 30.2+。
+- =M-x org-typst-preview=: asynchronously preview all math in the buffer;
+  with a prefix argument, clear previews.
+- =M-x org-typst-math-preview-refresh= and =org-typst-math-preview-clear=:
+  explicitly refresh or clear previews.
+- =M-x org-typst-math-preview-diagnostics=: view errors and their locations.
 
-- =M-x org-typst-preview=：异步批量预览当前 buffer；带前缀参数时清除预览。
-- =M-x org-typst-math-preview-refresh=、=org-typst-math-preview-clear=：显式刷新、清除。
-- =M-x org-typst-math-preview-diagnostics=：查看错误位置。
-
-org-fragtog-plus 是独立可选包，默认使用 Org 内置 LaTeX 预览。
-启用 org-typst-math-mode 时自动选择 buffer-local Typst backend，关闭时恢复 LaTeX。
-没有对原 org-fragtog 的 advice，也不依赖原包；同一 buffer 不要同时启用两个切换 mode。
+org-fragtog-plus is an independent, optional package. It uses Org's built-in
+LaTeX preview by default. Enabling org-typst-math-mode selects the buffer-local
+Typst backend; disabling it restores LaTeX.
+It neither depends on nor advises the original org-fragtog package.
+Do not enable both toggling modes in the same buffer.
 
 #+begin_src emacs-lisp
 (require 'org-typst-math)
 (require 'org-fragtog-plus)
-;; 在需要 Typst 数学预览的 Org buffer 中：
+;; In an Org buffer using Typst math:
 (org-typst-math-mode 1)
 (org-fragtog-plus-mode 1)
-(org-typst-preview) ; 可选：立即预览整个 buffer
+(org-typst-preview) ; Optional: preview the entire buffer immediately.
 #+end_src
 
-光标进入公式时显示源码，离开时恢复图片，必要时请求新的 SVG。
-=org-fragtog-plus-delay= 设置显示源码前的空闲秒数（默认 0）；
-图片缩放使用 =org-typst-math-preview-scale=。编辑过的图片立即失效；
-不使用 org-fragtog-plus 时仍可手动预览。关闭自动切换时清除对应 backend 的预览和待处理工作。
+Entering a formula reveals its source; leaving it restores the image, requesting
+a new SVG when needed. =org-fragtog-plus-delay= sets the idle delay before
+revealing source, in seconds (default 0). Set =org-typst-math-preview-scale=
+to adjust image size.
 
-** 扩展 backend
+Editing a formula invalidates its image immediately. Manual preview remains
+available without org-fragtog-plus. Disabling automatic toggling clears the
+backend's previews and invalidates pending results.
 
-=org-fragtog-plus-backend= 是 buffer-local 函数，接受 ACTION 和可选 FRAGMENT。
-使用 =org-fragtog-plus-set-backend= 切换已启用 buffer 的 backend，它会先清理旧状态。
+** Extending the backend
 
-| ACTION   | 行为 |
-| fragment | 返回光标处的 Org element，没有则 nil；不包含片段后的空白 |
-| show     | 显示 FRAGMENT 的预览，重复调用不应反向切换 |
-| hide     | 显示 FRAGMENT 的源码，重复调用不应反向切换 |
-| clear    | 清理当前 buffer 的预览，使未完成结果失效 |
+=org-fragtog-plus-backend= is a buffer-local function accepting ACTION and an
+optional FRAGMENT. Use =org-fragtog-plus-set-backend= to switch backends in an
+active buffer; it clears the previous backend's state first.
 
-异步 backend 安装结果时应保留光标所在公式的源码显示。Typst adapter 继续使用已有
-SVG 批处理、缓存与 diagnostics；org-fragtog-plus 自身无需了解 Rust 或 Typst。
+| ACTION | Behavior |
+|--------+----------|
+| fragment | Return the Org element at point, or nil; exclude trailing whitespace |
+| show | Display FRAGMENT's preview; repeated calls must not toggle it off |
+| hide | Reveal FRAGMENT's source; repeated calls must not toggle it back |
+| clear | Clear buffer previews and invalidate pending results |
+
+Asynchronous backends should keep the formula at point visible as source when
+installing results. The Typst adapter reuses existing SVG batching, caching,
+and diagnostics. org-fragtog-plus itself does not need to know about Rust or Typst.
