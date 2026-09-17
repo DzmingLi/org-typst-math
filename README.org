@@ -174,6 +174,9 @@ Org menu. Math macros still belong in TYPST_HEADER.
 
 Previews are included in org-typst-math and share the persistent helper with
 export. They require graphical Emacs 30.2+ with SVG support.
+Display formulas are centered in the window's text area; inline formulas stay
+in place. Centering adjusts with the window width and disappears when source
+is revealed.
 
 - =M-x org-typst-preview=: asynchronously preview all math in the buffer;
   with a prefix argument, clear previews.

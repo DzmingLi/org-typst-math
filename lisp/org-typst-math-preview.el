@@ -31,17 +31,22 @@
   (mapc #'delete-overlay org-typst-math-preview--overlays)
   (setq org-typst-math-preview--overlays nil))
 
+(defun org-typst-math-preview--show (overlay visible)
+  "Show OVERLAY's image and alignment when VISIBLE, otherwise its source."
+  (overlay-put overlay 'display (and visible (overlay-get overlay 'org-typst-image)))
+  (overlay-put overlay 'before-string (and visible (overlay-get overlay 'org-typst-before)))
+  (overlay-put overlay 'after-string (and visible (overlay-get overlay 'org-typst-after))))
+
 (defun org-typst-math-preview--toggle ()
   "Reveal the formula at point and display the other previews."
   (dolist (overlay org-typst-math-preview--overlays)
     (when (overlay-buffer overlay)
-      (overlay-put overlay 'display
-                   (unless (and org-typst-math-mode
+      (org-typst-math-preview--show
+       overlay (not (and org-typst-math-mode
                                 (bound-and-true-p org-fragtog-plus-mode)
                                 (eq org-fragtog-plus-backend #'org-typst-math-preview-backend)
                                 (<= (overlay-start overlay) (point))
-                                (< (point) (overlay-end overlay)))
-                     (overlay-get overlay 'org-typst-image))))))
+                                (< (point) (overlay-end overlay))))))))
 
 (defun org-typst-math-preview--modified (overlay after &rest _)
   "Remove OVERLAY after its underlying source changes."
@@ -64,6 +69,15 @@
                                       :margin (cons 0 (if (eq (plist-get fragment :display) t)
                                                           0
                                                         (ceiling (/ org-typst-math-preview-inline-padding 2.0))))))
+           (when (eq (plist-get fragment :display) t)
+             (let ((half-width (/ (car (image-size (overlay-get overlay 'org-typst-image) t)) 2.0)))
+               ;; Pixel offsets retain the correct alignment when the window resizes.
+               (overlay-put overlay 'org-typst-before
+                            (concat (save-excursion (goto-char start) (unless (bolp) "\n"))
+                                    (propertize " " 'display
+                                                `(space :align-to (- center (,half-width))))))
+               (overlay-put overlay 'org-typst-after
+                            (save-excursion (goto-char end) (unless (eolp) "\n")))))
            (overlay-put overlay 'evaporate t)
            (overlay-put overlay 'modification-hooks '(org-typst-math-preview--modified))
            (push overlay org-typst-math-preview--overlays)))
@@ -160,11 +174,11 @@
          element)))
     ('show
      (if-let* ((overlay (org-typst-math-preview--fragment-overlay fragment)))
-         (overlay-put overlay 'display (overlay-get overlay 'org-typst-image))
+         (org-typst-math-preview--show overlay t)
        (org-typst-math-preview-refresh)))
     ('hide
      (when-let* ((overlay (org-typst-math-preview--fragment-overlay fragment)))
-       (overlay-put overlay 'display nil)))
+       (org-typst-math-preview--show overlay nil)))
     ('clear (org-typst-math-preview-clear))))
 
 (defun org-typst-math-preview--setup-backend ()
