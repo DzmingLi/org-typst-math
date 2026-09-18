@@ -65,7 +65,8 @@ sum_(k=1)^n k = (n(n+1))/2
 
 已实现。=org-pretty-entities= 非 nil 且 =org-typst-math-mode= 启用时，
 数学片段内 =org-typst-math-entities= 列出的 Typst 标识符用 Unicode 显示。
-默认含希腊字母和 integral、sum、dif、compose、dot、eq.not、tack.r 等常用算子，
+默认含希腊字母和 integral、sum、dif、compose、dot、eq.not、tack.r、
+in、forall、exists、times 等常用算子，
 其他符号由用户在该 alist 中添加。标识符可含 =.=，以支持 =eq.not=、
 =tack.r= 这类带变体的符号名。
 

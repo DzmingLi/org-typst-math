@@ -40,7 +40,8 @@ Only listed blocks are converted.  No prefixes are stripped automatically."
     ;; Common operators and relations.
     ("integral" . "∫") ("sum" . "∑") ("dif" . "d")
     ("compose" . "∘") ("dot" . "⋅") ("eq.not" . "≠")
-    ("tack.r" . "⊢"))
+    ("tack.r" . "⊢") ("in" . "∈") ("forall" . "∀")
+    ("exists" . "∃") ("times" . "×"))
   "Alist mapping Typst math identifiers to Unicode replacements.
 Used together with `org-pretty-entities' and `org-typst-math-mode': when
 both are enabled, these identifiers are displayed as Unicode characters
@@ -76,14 +77,29 @@ N is the delimiter length in characters.  Return nil for non-math LaTeX."
   "[[:alpha:]][[:alnum:]]*\\(?:\\.[[:alpha:]][[:alnum:]]*\\)*"
   "Regexp matching a candidate Typst math identifier and its variants.")
 
-(defun org-typst-math--in-math-p (pos)
-  "Return non-nil when POS is inside a Typst math fragment."
-  (save-match-data
-    (save-excursion
-      (goto-char pos)
-      (let ((element (org-element-context)))
-        (and (org-element-type-p element 'latex-fragment)
-             (org-typst-math-fragment element))))))
+(defvar-local org-typst-math--math-ranges nil
+  "Cache of Typst math fragment ranges.
+Value is (KEY . RANGES), where KEY describes the buffer state and RANGES
+is a list of (BEG . END) spans.")
+
+(defun org-typst-math--math-ranges ()
+  "Return the cached (BEG . END) ranges of Typst math fragments.
+The cache is refreshed only when the buffer text, narrowing, or modification
+tick changes, so font-lock never parses per identifier."
+  (let ((key (list (buffer-chars-modified-tick) (point-min) (point-max))))
+    (unless (equal (car-safe org-typst-math--math-ranges) key)
+      (setq org-typst-math--math-ranges
+            (cons key
+                  (let (ranges)
+                    (org-element-map (org-element-parse-buffer) 'latex-fragment
+                      (lambda (element)
+                        (when (org-typst-math-fragment element)
+                          (push (cons (org-element-property :begin element)
+                                      (org-element-property :end element))
+                                ranges))
+                        nil))
+                    (nreverse ranges)))))
+    (cdr org-typst-math--math-ranges)))
 
 (defun org-typst-math--fontify-entities (limit)
   "Compose Typst math entities before LIMIT.
@@ -94,17 +110,21 @@ A font-lock matcher that follows `org-pretty-entities' and only runs in
              org-pretty-entities
              org-typst-math-entities)
     (catch 'match
-      (while (re-search-forward org-typst-math--identifier-re limit t)
-        (let ((beg (match-beginning 0))
-              (end (match-end 0))
-              (entry (assoc (match-string 0) org-typst-math-entities)))
-          (when (and entry
-                     ;; Leave \alpha to `org-fontify-entities'.
-                     (not (eq (char-before beg) ?\\))
-                     (org-typst-math--in-math-p beg))
-            (add-text-properties beg end '(font-lock-fontified t))
-            (compose-region beg end (cdr entry) nil)
-            (throw 'match t))))
+      (dolist (range (org-typst-math--math-ranges))
+        (when (and (< (point) (cdr range))
+                   (< (car range) limit))
+          (goto-char (max (point) (car range)))
+          (while (re-search-forward org-typst-math--identifier-re
+                                    (min limit (cdr range)) t)
+            (let ((beg (match-beginning 0))
+                  (end (match-end 0))
+                  (entry (assoc (match-string 0) org-typst-math-entities)))
+              (when (and entry
+                         ;; Leave \alpha to `org-fontify-entities'.
+                         (not (eq (char-before beg) ?\\)))
+                (add-text-properties beg end '(font-lock-fontified t))
+                (compose-region beg end (cdr entry) nil)
+                (throw 'match t))))))
       nil)))
 
 (defun org-typst-math--font-lock-keywords ()

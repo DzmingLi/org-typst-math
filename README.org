@@ -100,7 +100,8 @@ $alpha + beta = gamma$   ; displays as α + β = γ
 #+end_example
 
 Greek letters and a few common operators (such as =integral=, =sum=,
-=dif=, =compose=, =dot=, =eq.not=, and =tack.r=) are recognized by default. Customize
+=dif=, =compose=, =dot=, =eq.not=, =tack.r=, =in=, =forall=, =exists=,
+and =times=) are recognized by default. Customize
 =M-x customize-variable RET org-typst-math-entities= to add more symbols, for
 example =("infinity" . "∞")= or =("partial" . "∂")=, or set it to nil to
 prettify nothing. =M-x org-toggle-pretty-entities= and
