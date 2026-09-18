@@ -86,6 +86,27 @@ Export uses the document declaration or the =:typst-math t= option passed to
 =typst-math-typst= explicitly also enables the corresponding exporter.
 Load ox-typst before using the derived Typst exporter.
 
+* Displaying Unicode symbols
+
+When =org-pretty-entities= is enabled, Typst math identifiers listed in
+=org-typst-math-entities= are displayed as Unicode characters inside math
+fragments. This is display-only: the source text, previews, and exports keep
+the original Typst identifiers.
+
+#+begin_example
+#+STARTUP: entitiespretty
+
+$alpha + beta = gamma$   ; displays as α + β = γ
+#+end_example
+
+Greek letters and a few common operators (such as =integral=, =sum=,
+=dif=, =compose=, =dot=, =eq.not=, and =tack.r=) are recognized by default. Customize
+=M-x customize-variable RET org-typst-math-entities= to add more symbols, for
+example =("infinity" . "∞")= or =("partial" . "∂")=, or set it to nil to
+prettify nothing. =M-x org-toggle-pretty-entities= and
+=#+STARTUP: entitiespretty= work as usual, and compositions are removed when
+=org-typst-math-mode= is disabled.
+
 * Packages and processes
 
 | Package or module | Files | Dependencies |

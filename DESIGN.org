@@ -61,6 +61,19 @@ sum_(k=1)^n k = (n(n+1))/2
 
 补全和源码编辑模式为后续功能。
 
+* 源码显示：org-pretty-entities
+
+已实现。=org-pretty-entities= 非 nil 且 =org-typst-math-mode= 启用时，
+数学片段内 =org-typst-math-entities= 列出的 Typst 标识符用 Unicode 显示。
+默认含希腊字母和 integral、sum、dif、compose、dot、eq.not、tack.r 等常用算子，
+其他符号由用户在该 alist 中添加。标识符可含 =.=，以支持 =eq.not=、
+=tack.r= 这类带变体的符号名。
+
+实现挂在 =org-font-lock-set-keywords-hook= 上，追加一个只处理数学片段的
+font-lock matcher；片段判定复用 =org-typst-math-fragment=。显示只改 composition，
+不改源码、预览与导出。关闭 mode 时 decompose 并重新 fontify，恢复
+=org-fontify-entities= 自己的 composition。
+
 * 通用 special block 导出
 
 已实现。=org-typst-math-block-alist= 是默认值为 =nil= 的 defcustom alist，
