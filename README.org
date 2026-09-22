@@ -122,7 +122,6 @@ prettify nothing. =M-x org-toggle-pretty-entities= and
 
 | Package or module | Files | Dependencies |
 |-------------------+-------+--------------|
-| Internal client module | lisp/typst-client.el | Included in org-typst-math |
 | org-typst-math | lisp/org-typst-math.el, lisp/org-typst-math-export.el | Org, Emacs jsonrpc |
 
 | Built-in preview module | lisp/org-typst-math-preview.el | Included in org-typst-math |
@@ -139,9 +138,9 @@ needed, then evaluate =(require 'org-typst-math)=. For automatic preview togglin
 [[https://github.com/DzmingLi/org-fragtog-plus][org-fragtog-plus]] from its separate repository.
 The Rust helper is built separately and is not included in the Elisp archives.
 
-For package managers that select source files, include =lisp/org-typst-math*.el=
-and =lisp/typst-client.el= in org-typst-math. The client, export, and preview
-modules are internal parts of this package. The optional toggling package is maintained in its own repository.
+For package managers that select source files, include =lisp/org-typst-math*.el=.
+The helper connection lives in the main module; export and preview are internal
+modules of the same package. The optional toggling package is maintained in its own repository.
 
 The client reuses one connection per document directory. Each HTML/LaTeX
 export collects all math fragments into one batch JSON-RPC request. Rust retains
@@ -151,6 +150,15 @@ or separate process per formula.
 Typst export passes through math source and headers without using the helper.
 =M-x typst-client-stop= closes existing processes; subsequent requests restart
 them automatically. The client also provides asynchronous conversion for previews.
+Timeouts and transport failures discard the connection so subsequent requests can
+start a fresh helper. Process errors identify the executable, project directory,
+and stderr buffer; they are also retained in the diagnostics window.
+
+Diagnostics retain errors from other documents and, during partial preview
+updates, from other formulas. Editing a formula invalidates its old preview
+diagnostics. Typst hints and call traces are displayed with the main error.
+The helper connection code lives in =org-typst-math.el= and is shared by preview
+and export. =typst-client-command= is a variable set with =setq=, not a Customize option.
 
 * Math environments and custom blocks
 

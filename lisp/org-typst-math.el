@@ -12,9 +12,131 @@
 ;;; Code:
 (require 'org)
 (require 'ox)
-(require 'typst-client)
+(require 'jsonrpc)
+(require 'subr-x)
 
 (defgroup org-typst-math nil "Typst mathematics in Org." :group 'org)
+
+;; Persistent helper connection shared by export and preview.
+(defvar typst-client-command '("org-typst-math-helper")
+  "Helper program and arguments, passed directly to `make-process'.
+Set this with `setq' when the helper is not on PATH.")
+
+(defcustom typst-client-timeout 30
+  "Seconds to wait for a conversion."
+  :type 'number :group 'org-typst-math)
+
+(defvar typst-client--connections (make-hash-table :test #'equal))
+
+(define-error 'typst-client-error "Typst helper error")
+
+(defun typst-client--disconnect (connection)
+  "Remove CONNECTION from the cache before terminating it.
+Pending requests are completed by jsonrpc's process sentinel."
+  (when connection
+    (maphash (lambda (root value)
+               (when (eq value connection) (remhash root typst-client--connections)))
+             typst-client--connections)
+    (when (jsonrpc-running-p connection)
+      (delete-process (jsonrpc--process connection)))
+    (jsonrpc-shutdown connection)))
+
+(defun typst-client--failure (root detail &optional connection)
+  "Describe a helper failure in ROOT with DETAIL and optional CONNECTION."
+  (let ((stderr (and connection (jsonrpc-stderr-buffer connection))))
+    (format "Typst helper (%s) in %s: %s. %s"
+            (mapconcat #'identity typst-client-command " ") root detail
+            (if (buffer-live-p stderr)
+                (format "See buffer %s for stderr; the next request starts a new helper"
+                        (buffer-name stderr))
+              "Check typst-client-command and that the executable is installed"))))
+
+(defun typst-client--connection (root)
+  "Return the live connection for ROOT, starting one if necessary."
+  (let* ((root (file-name-as-directory (file-truename root)))
+         (connection (gethash root typst-client--connections)))
+    (unless (and connection (jsonrpc-running-p connection))
+      (let* ((default-directory root)
+             (name (concat "typst-" (substring (md5 root) 0 8))))
+        (setq connection nil)
+        (condition-case err
+            (progn
+              (setq connection
+                    (jsonrpc-process-connection
+                     :name name
+                     :process (make-process
+                               :name name :command typst-client-command
+                               :connection-type 'pipe :noquery t
+                               :stderr (get-buffer-create (format "*%s stderr*" name)))))
+              (let ((hello (jsonrpc-request connection :initialize
+                                            '(:protocolVersion 1)
+                                            :timeout typst-client-timeout)))
+                (unless (eq (plist-get hello :protocolVersion) 1)
+                  (error "Unsupported protocol version %S (expected 1)"
+                         (plist-get hello :protocolVersion)))
+                (puthash root connection typst-client--connections)))
+          (quit (typst-client--disconnect connection) (signal 'quit nil))
+          (error
+           (let ((message (typst-client--failure root (error-message-string err) connection)))
+             (typst-client--disconnect connection)
+             (signal 'typst-client-error (list message)))))))
+    connection))
+
+(defun typst-client-convert (root preamble items &optional target)
+  "Convert ITEMS to TARGET (default mathml) in ROOT with PREAMBLE.
+ITEMS is a list of plists with :id, :source and JSON boolean :display.
+Return the helper result, including per-formula diagnostics."
+  (let ((connection (typst-client--connection root)))
+    (condition-case err
+        (jsonrpc-request connection :math/convert
+                         (list :root (expand-file-name root)
+                               :preamble preamble :items (vconcat items)
+                               :target (or target "mathml"))
+                         :timeout typst-client-timeout)
+      (quit (typst-client--disconnect connection) (signal 'quit nil))
+      (error
+       (let ((message (typst-client--failure root (error-message-string err) connection)))
+         (typst-client--disconnect connection)
+         (signal 'typst-client-error (list message)))))))
+
+(defun typst-client-convert-async (root preamble items success error &optional target)
+  "Convert ITEMS asynchronously; call SUCCESS or ERROR once with the result.
+ROOT, PREAMBLE and TARGET have the same meaning as `typst-client-convert'.
+Timeouts and transport failures discard the connection before ERROR runs."
+  (let (connection completed)
+    (cl-labels
+        ((fail (detail)
+           (unless completed
+             ;; Shutdown may invoke this request's error continuation again.
+             (setq completed t)
+             (let ((message (if connection (typst-client--failure root detail connection) detail)))
+               (typst-client--disconnect connection)
+               (funcall error (list :message message))))))
+      (condition-case err
+          (progn
+            (setq connection (typst-client--connection root))
+            (jsonrpc-async-request
+             connection :math/convert
+             (list :root (expand-file-name root) :preamble preamble
+                   :items (vconcat items) :target (or target "mathml"))
+             :success-fn (lambda (result)
+                           (unless completed (setq completed t) (funcall success result)))
+             :error-fn (lambda (err) (fail (or (plist-get err :message) (format "%S" err))))
+             :timeout typst-client-timeout
+             :timeout-fn (lambda () (fail (format "Conversion timed out after %s seconds"
+                                                 typst-client-timeout)))))
+        (quit (setq completed t) (typst-client--disconnect connection) (signal 'quit nil))
+        (error (fail (error-message-string err)))))))
+
+(defun typst-client-stop ()
+  "Stop all helper connections; the next request starts them again."
+  (interactive)
+  (maphash (lambda (_ connection)
+             (when (jsonrpc-running-p connection)
+               (jsonrpc-notify connection :exit nil)
+               (jsonrpc-shutdown connection)))
+           typst-client--connections)
+  (clrhash typst-client--connections))
 
 (defcustom org-typst-math-entities
   '(;; Lowercase Greek letters, as spelled in Typst math.

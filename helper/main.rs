@@ -251,6 +251,12 @@ impl MathWorld<'_> {
             "severity": format!("{:?}", d.severity).to_lowercase(),
             "message": d.message.as_str(),
             "hints": d.hints.iter().map(|h| h.v.as_str()).collect::<Vec<_>>(),
+            "trace": d.trace.iter().map(|point| {
+                self.diagnostic(
+                    &SourceDiagnostic::error(point.span, point.v.to_string()),
+                    preamble_len, prefix_len, source_len,
+                )
+            }).collect::<Vec<_>>(),
         });
         if let Some(id) = d.span.id()
             && let Ok(source) = self.source(id)

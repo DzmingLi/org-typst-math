@@ -10,8 +10,9 @@
 ;;; Code:
 (require 'ox-html)
 (require 'ox-latex)
-(require 'typst-client)
 (require 'compile)
+
+(declare-function typst-client-convert "org-typst-math" (root preamble items &optional target))
 
 (declare-function org-typst-math-fragment "org-typst-math" (element))
 (declare-function org-typst-math--enabled-p "org-typst-math" (value))
@@ -67,17 +68,48 @@ ELEMENT, FRAGMENT and PREAMBLE describe the export snapshot."
            (list (or buffer-file-name "<Org export>")
                  (line-number-at-pos) (1+ (- (point) (line-beginning-position))))))))))
 
+(defvar org-typst-math--diagnostic-sources (make-hash-table :test #'equal)
+  "Latest diagnostics by source file or buffer name.
+The shared diagnostics window presents every source, not just the last batch.")
+
+(defun org-typst-math--diagnostic-entry (diagnostic element fragment preamble)
+  "Format DIAGNOSTIC for ELEMENT and FRAGMENT using PREAMBLE."
+  (append
+   (org-typst-math--location diagnostic element fragment preamble)
+   (list (plist-get diagnostic :severity)
+         (concat
+          (plist-get diagnostic :message)
+          (mapconcat (lambda (hint) (concat "\n  hint: " hint))
+                     (plist-get diagnostic :hints) "")
+          (mapconcat
+           (lambda (trace)
+             (pcase-let ((`(,file ,line ,column)
+                          (org-typst-math--location trace element fragment preamble)))
+               (format "\n  %s:%d:%d: %s" file line column (plist-get trace :message))))
+           (plist-get diagnostic :trace) "")))))
+
 (defun org-typst-math--diagnostics (entries)
-  "Display diagnostic ENTRIES as compilation messages."
+  "Replace this source's diagnostics with ENTRIES and display all sources."
+  (let ((source (or buffer-file-name (buffer-name))))
+    (if entries
+        (puthash source (delete-dups entries) org-typst-math--diagnostic-sources)
+      (remhash source org-typst-math--diagnostic-sources)))
   (with-current-buffer (get-buffer-create "*Org Typst diagnostics*")
     (let ((inhibit-read-only t))
       (erase-buffer)
-      (dolist (entry entries)
-        (pcase-let ((`(,file ,line ,column ,severity ,message) entry))
-          (insert (format "%s:%d:%d: %s: %s\n" file line column severity message)))))
+      (maphash
+       (lambda (_source diagnostics)
+         (dolist (entry diagnostics)
+           (pcase-let ((`(,file ,line ,column ,severity ,message) entry))
+             (insert (format "%s:%d:%d: %s: %s\n" file line column severity message)))))
+       org-typst-math--diagnostic-sources))
     (compilation-mode))
   (when (seq-some (lambda (entry) (equal (nth 3 entry) "error")) entries)
     (display-buffer "*Org Typst diagnostics*")))
+
+(defun org-typst-math--process-error-entry (message)
+  "Return a persistent diagnostic entry for helper failure MESSAGE."
+  (list (or buffer-file-name (buffer-name)) 1 1 "error" message))
 
 (defun org-typst-math--prepare (tree backend info)
   "Batch-convert math in TREE for BACKEND, saving artifacts on its nodes.
@@ -94,9 +126,15 @@ INFO contains this export's preamble and document settings."
                       :source (plist-get fragment :source)
                       :display (plist-get fragment :display)) items))))
     (setq elements (nreverse elements) fragments (nreverse fragments) items (nreverse items))
+    (unless items (org-typst-math--diagnostics nil))
     (when items
-      (let* ((result (typst-client-convert default-directory preamble items
-                                          (if htmlp "mathml" "latex")))
+      (let* ((result (condition-case err
+                         (typst-client-convert default-directory preamble items
+                                               (if htmlp "mathml" "latex"))
+                       (error
+                        (org-typst-math--diagnostics
+                         (list (org-typst-math--process-error-entry (error-message-string err))))
+                        (signal (car err) (cdr err)))))
              (results (plist-get result :items))
              css entries failed)
         (cl-mapc
@@ -108,8 +146,7 @@ INFO contains this export's preamble and document settings."
                    (when htmlp (cl-pushnew (plist-get artifact :css) css :test #'equal)))
                (setq failed t)))
            (seq-doseq (diagnostic (plist-get result :diagnostics))
-             (cl-pushnew (append (org-typst-math--location diagnostic element fragment preamble)
-                                 (list (plist-get diagnostic :severity) (plist-get diagnostic :message)))
+             (cl-pushnew (org-typst-math--diagnostic-entry diagnostic element fragment preamble)
                          entries :test #'equal)))
          elements fragments (append results nil))
         (org-typst-math--diagnostics (nreverse entries))

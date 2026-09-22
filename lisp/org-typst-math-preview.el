@@ -16,6 +16,8 @@
   :type 'natnum :group 'org-typst-math)
 
 (defvar-local org-typst-math-preview--overlays nil)
+(defvar-local org-typst-math-preview--diagnostics nil)
+(defvar-local org-typst-math-preview--process-error nil)
 (defvar-local org-typst-math-preview--generation 0)
 (defvar-local org-typst-math-preview--pending nil)
 (defvar-local org-typst-math-preview--dirty nil)
@@ -35,7 +37,11 @@
         org-typst-math-preview--scheduled nil)
   (setq org-typst-math-preview--dirty nil)
   (mapc #'delete-overlay org-typst-math-preview--overlays)
-  (setq org-typst-math-preview--overlays nil))
+  (setq org-typst-math-preview--overlays nil)
+  (mapc #'delete-overlay org-typst-math-preview--diagnostics)
+  (setq org-typst-math-preview--diagnostics nil
+        org-typst-math-preview--process-error nil)
+  (org-typst-math-preview--publish-diagnostics))
 
 (defun org-typst-math-preview--show (overlay visible)
   "Show OVERLAY's image and alignment when VISIBLE, otherwise its source."
@@ -58,12 +64,55 @@
   "Remove OVERLAY after its underlying source changes."
   (when after (delete-overlay overlay)))
 
+(defun org-typst-math-preview--publish-diagnostics ()
+  "Publish this buffer's current formula and process diagnostics quietly."
+  (let ((preamble (org-typst-math-preview--preamble)) entries kept)
+    (dolist (overlay org-typst-math-preview--diagnostics)
+      (when (overlay-buffer overlay)
+        (let* ((element (save-excursion
+                          (goto-char (overlay-start overlay)) (org-element-context)))
+               (fragment (and (org-element-type-p element 'latex-fragment)
+                              (org-typst-math-fragment element))))
+          (if (and fragment
+                   (= (org-element-property :begin element) (overlay-start overlay))
+                   (equal preamble (overlay-get overlay 'preamble)))
+              (progn
+                (push overlay kept)
+                (seq-doseq (diagnostic (overlay-get overlay 'diagnostics))
+                  (push (org-typst-math--diagnostic-entry
+                         diagnostic element fragment preamble) entries)))
+            (delete-overlay overlay)))))
+    (setq org-typst-math-preview--diagnostics (nreverse kept))
+    (when org-typst-math-preview--process-error
+      (push (org-typst-math--process-error-entry org-typst-math-preview--process-error) entries))
+    (let ((display-buffer-alist '((".*" (display-buffer-no-window) (allow-no-window . t)))))
+      (org-typst-math--diagnostics (nreverse entries)))))
+
+(defun org-typst-math-preview--save-diagnostics (element diagnostics preamble)
+  "Replace ELEMENT's DIAGNOSTICS, keeping other formulas' results and PREAMBLE."
+  (let ((start (org-element-property :begin element)))
+    (dolist (overlay org-typst-math-preview--diagnostics)
+      (when (and (overlay-buffer overlay) (= (overlay-start overlay) start))
+        (delete-overlay overlay)))
+    (when (and diagnostics (> (seq-length diagnostics) 0))
+      (let ((overlay (make-overlay start (+ start (length (org-element-property :value element)))
+                                   nil t nil)))
+        (overlay-put overlay 'evaporate t)
+        (overlay-put overlay 'modification-hooks '(org-typst-math-preview--modified))
+        (overlay-put overlay 'diagnostics diagnostics)
+        (overlay-put overlay 'preamble preamble)
+        (push overlay org-typst-math-preview--diagnostics)))))
+
 (defun org-typst-math-preview--apply (result elements fragments preamble &optional preserve)
   "Install RESULT for ELEMENTS and FRAGMENTS, mapping PREAMBLE diagnostics.
 When PRESERVE is non-nil, keep previews outside ELEMENTS."
   (setq org-typst-math-preview--overlays
         (seq-filter #'overlay-buffer org-typst-math-preview--overlays))
-  (let (entries kept)
+  (unless preserve
+    (mapc #'delete-overlay org-typst-math-preview--diagnostics)
+    (setq org-typst-math-preview--diagnostics nil))
+  (setq org-typst-math-preview--process-error nil)
+  (let (kept)
     (cl-mapc
      (lambda (element fragment item)
        (unless (plist-get (plist-get item :artifact) :svg)
@@ -102,24 +151,21 @@ When PRESERVE is non-nil, keep previews outside ELEMENTS."
            (overlay-put overlay 'modification-hooks '(org-typst-math-preview--modified))
            (push overlay kept)
            (cl-pushnew overlay org-typst-math-preview--overlays)))
-       (seq-doseq (diagnostic (plist-get item :diagnostics))
-         (push (append (org-typst-math--location diagnostic element fragment preamble)
-                       (list (plist-get diagnostic :severity) (plist-get diagnostic :message)))
-               entries)))
+       (org-typst-math-preview--save-diagnostics element (plist-get item :diagnostics) preamble))
      elements fragments (append (plist-get result :items) nil))
     (unless preserve
       (dolist (overlay org-typst-math-preview--overlays)
         (unless (memq overlay kept) (delete-overlay overlay))))
     (setq org-typst-math-preview--overlays
           (seq-filter #'overlay-buffer org-typst-math-preview--overlays))
-    ;; Keep typing uninterrupted; diagnostics remain available via the command.
-    (let ((display-buffer-alist '((".*" (display-buffer-no-window) (allow-no-window . t)))))
-      (org-typst-math--diagnostics (nreverse entries))))
+    (org-typst-math-preview--publish-diagnostics))
   (org-typst-math-preview--toggle))
 
 (defun org-typst-math-preview-diagnostics ()
   "Show the shared Typst diagnostics buffer."
   (interactive)
+  (when (or org-typst-math-preview--diagnostics org-typst-math-preview--process-error)
+    (org-typst-math-preview--publish-diagnostics))
   (display-buffer (get-buffer-create "*Org Typst diagnostics*")))
 
 (defun org-typst-math-preview--preamble ()
@@ -244,8 +290,11 @@ With MISSING-ONLY, retain existing previews and render only missing ones."
                (lambda (error)
                  (when (buffer-live-p buffer)
                    (with-current-buffer buffer
-                     (finish)
-                     (message "Typst preview: %s" (plist-get error :message)))))
+                     (when (= generation org-typst-math-preview--generation)
+                       (setq org-typst-math-preview--process-error (plist-get error :message))
+                       (org-typst-math-preview--publish-diagnostics)
+                       (message "Typst preview: %s" org-typst-math-preview--process-error))
+                     (finish))))
                "svg")
             (error (finish) (signal (car err) (cdr err)))))))))
 
