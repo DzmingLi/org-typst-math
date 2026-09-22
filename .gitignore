@@ -7,3 +7,8 @@
 
 # Local verification files are not part of the published repository.
 /tests/
+
+# Local design notes, compatibility records, and examples.
+/DESIGN.org
+/COMPATIBILITY.org
+/examples/

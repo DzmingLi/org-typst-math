@@ -75,7 +75,7 @@ nix develop -c cargo2nix --locked --overwrite
 nix fmt -- Cargo.nix
 #+end_src
 
-Use the standard Org export menu in an example buffer:
+Use the standard Org export menu in your Org buffer:
 
 | Keys          | Output                  |
 |---------------+-------------------------|
@@ -245,8 +245,8 @@ Special block functions, header parameters, labels, and references belong to
 ox-typst. This package inherits that behavior and only handles math fragments.
 They do not require =TYPST_MATH= or loading org-typst-math.
 
-Use [[https://github.com/DzmingLi/ox-typst][the ox-typst fork]] for the block examples in
-[[file:examples/blocks.org][blocks.org]]. These additions are not yet in upstream ox-typst;
+Use [[https://github.com/DzmingLi/ox-typst][the ox-typst fork]] for special block support.
+These additions are not yet in upstream ox-typst;
 versions without them only export special block contents.
 HTML and LaTeX blocks use Org's native exporters.
 
