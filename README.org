@@ -160,6 +160,48 @@ diagnostics. Typst hints and call traces are displayed with the main error.
 The helper connection code lives in =org-typst-math.el= and is shared by preview
 and export. =typst-client-command= is a variable set with =setq=, not a Customize option.
 
+* Generic Typst content and link previews
+
+The helper also accepts ordinary Typst markup, not just math bodies.
+=typst-client-render= and =typst-client-render-async= have the same root,
+preamble, item, and diagnostic contract as the math conversion API, with
+SVG output.  They send =typst/render= over the same persistent connection.
+
+#+begin_src emacs-lisp
+(typst-client-render
+ default-directory ""
+ '((:id "shape" :source "#rect(width: 20pt, height: 10pt)")))
+#+end_src
+
+For link adapters, =org-typst-math-preview-link= takes an Org-owned overlay
+and Typst source (a string or a zero-argument function returning one).  It
+handles asynchronous rendering, theme colour, scaling, centering, and stale
+results.  Org owns clearing/edit invalidation.  No math mode is required.
+Errors leave the link readable and set its help text.
+
+For example, the optional org-quiver package can be connected in user config:
+
+#+begin_src emacs-lisp
+(with-eval-after-load 'org-quiver
+  (setq org-quiver-preview-function
+        (lambda (overlay url _link)
+          (org-typst-math-preview-link
+           overlay (lambda () (org-quiver-fletcher url))))))
+#+end_src
+
+Quiver decoding and Fletcher conversion stay in org-quiver.  This package
+does not depend on it or duplicate its converter; any adapter producing Typst
+markup can use the same preview API.  Preview selection is independent of
+the document's export backend.
+
+Imports resolve relative to the document directory.  Package imports search
+=TYPST_PACKAGE_PATH= (a platform-separated list of package roots), then the
+XDG data and cache directories under =typst/packages=.  Each root contains
+=namespace/name/version/typst.toml=.  The helper never downloads packages;
+install them with Nix or populate the local cache first.  Missing packages
+produce per-item diagnostics.  Upgrade the Elisp module and helper together
+to use =typst/render=.
+
 * Math environments and custom blocks
 
 Special block functions, header parameters, labels, and references belong to

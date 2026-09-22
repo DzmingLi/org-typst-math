@@ -6,6 +6,7 @@
 ;;; Code:
 (require 'org-typst-math)
 (require 'color)
+(require 'image)
 
 (defun org-typst-math-preview--scale ()
   "Scale the helper's 12pt output to Emacs's default face size."
@@ -337,6 +338,70 @@ With MISSING-ONLY, retain existing previews and render only missing ones."
     (when (eq org-fragtog-plus-backend #'org-typst-math-preview-backend)
       (org-typst-math-preview-clear)
       (org-fragtog-plus-set-backend #'org-fragtog-plus-latex-backend))))
+
+(defun org-typst-math-preview-link (overlay source)
+  "Render Typst SOURCE in an Org-owned link OVERLAY asynchronously.
+SOURCE is markup text or a zero-argument function returning it.  This is a
+generic entry point for link adapters, independent of math-mode and Quiver.
+Read TYPST_HEADER and resolve imports in the current document directory.
+Return non-nil while rendering.  Editing or clearing the Org overlay,
+changing headers, or starting a new request invalidates late results.
+Conversion and rendering failures leave the link readable with help text."
+  (when (display-graphic-p)
+    (let* ((buffer (current-buffer))
+           (root default-directory)
+           (preamble (org-typst-math-preview--preamble))
+           (text (buffer-substring-no-properties (overlay-start overlay) (overlay-end overlay)))
+           (token (gensym "typst-link-preview"))
+           (foreground (color-values (face-foreground 'default nil t)))
+           (colour (if foreground
+                       (apply #'format "#%02x%02x%02x" (mapcar (lambda (c) (/ c 257)) foreground))
+                     "#000000")))
+      (overlay-put overlay 'org-typst-link-request token)
+      (cl-labels
+          ((current-p ()
+             (and (buffer-live-p buffer) (eq (overlay-buffer overlay) buffer)
+                  (eq (overlay-get overlay 'org-typst-link-request) token)
+                  (with-current-buffer buffer
+                    (and (equal preamble (org-typst-math-preview--preamble))
+                         (equal text (buffer-substring-no-properties
+                                      (overlay-start overlay) (overlay-end overlay)))))))
+           (fail (message)
+             (when (current-p)
+               (overlay-put overlay 'display nil)
+               (overlay-put overlay 'before-string nil)
+               (overlay-put overlay 'help-echo (concat "Typst preview: " message))
+               (message "Typst preview: %s" message)))
+           (render (source)
+             (when (current-p)
+               (with-current-buffer buffer
+                 (typst-client-render-async
+                  root preamble
+                  (list (list :id "content" :source source :foreground colour :display t))
+                  (lambda (result)
+                    (when (current-p)
+                      (with-current-buffer buffer
+                        (let* ((item (elt (plist-get result :items) 0))
+                               (svg (plist-get (plist-get item :artifact) :svg)))
+                          (if (not svg)
+                              (fail (mapconcat (lambda (d) (plist-get d :message))
+                                               (plist-get item :diagnostics) "; "))
+                            (condition-case err
+                                (let ((image (create-image svg 'svg t :ascent 'center
+                                                           :scale (org-typst-math-preview--scale)
+                                                           :max-width (floor (* 0.9 (window-body-width nil t))))))
+                                  (overlay-put overlay 'display image)
+                                  (overlay-put overlay 'face 'default)
+                                  (overlay-put overlay 'help-echo "Typst preview; C-c C-o follows the link")
+                                  (overlay-put overlay 'before-string
+                                               (propertize " " 'display
+                                                           `(space :align-to (- center (0.5 . ,image))))))
+                              (error (fail (error-message-string err)))))))))
+                  (lambda (err) (fail (or (plist-get err :message) (format "%S" err)))))))))
+        (condition-case err
+            (render (if (functionp source) (funcall source) source))
+          (error (fail (error-message-string err)))))
+      t)))
 
 (provide 'org-typst-math-preview)
 ;;; org-typst-math-preview.el ends here

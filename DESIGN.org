@@ -96,6 +96,20 @@ org-typst-math-preview.el 随核心包安装，提供 org-typst-preview
 第一版预览数学片段，读取当前 buffer 的 TYPST_HEADER；定理块整体预览、浮窗和
 可见区域调度不在本次实现中。公式诊断沿用现有位置映射，但自动刷新不弹出错误窗口。
 
+** 通用内容与链接预览扩展
+
+=typst/render= 接收完整 Typst markup 并输出 SVG，不把正文包进数学分隔符。
+它与 =math/convert= 共享常驻进程、字体、缓存和诊断结构。
+=typst-client-render= / =typst-client-render-async= 是对应 Elisp 接口。
+
+=org-typst-math-preview-link(overlay, source)= 接收 Org 管理的 overlay 和
+Typst 源码或同步源码函数，负责异步 SVG 显示及过期结果检查，不要求启用数学 mode。
+它不解析 Quiver URL，也不含 Quiver→Fletcher 转换；转换器属于 org-quiver，
+用户配置用一个薄回调连接两者。其他链接类型可以复用这个接口。
+
+Typst 包只从 =TYPST_PACKAGE_PATH= 和 XDG 本地包目录读取，不在 helper 内联网下载。
+包导入和普通文档导入沿用 Typst 虚拟路径解析。预览 SVG 不参与原生 LaTeX/Typst 导出。
+
 ** org-fragtog-plus
 
 独立仓库提供 org-fragtog-plus 包，支持 Emacs 30.2+，不依赖或 advice 原 org-fragtog。

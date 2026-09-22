@@ -64,6 +64,15 @@ impl Engine {
     }
 
     fn convert(&self, batch: Batch) -> Value {
+        self.convert_inner(batch, false)
+    }
+
+    fn render(&self, mut batch: Batch) -> Value {
+        batch.target = Target::Svg;
+        self.convert_inner(batch, true)
+    }
+
+    fn convert_inner(&self, batch: Batch, content: bool) -> Value {
         let mut world = MathWorld {
             engine: self,
             root: batch.root.clone(),
@@ -85,13 +94,15 @@ impl Engine {
                     format!("#set page(width: auto, height: auto, margin: 2pt, fill: none)\n#set text(size: 12pt, top-edge: \"bounds\", bottom-edge: \"bounds\", fill: rgb({}))\n",
                         serde_json::to_string(item.foreground.as_deref().unwrap_or("#000000")).unwrap())
                 } else { String::new() };
-                let prefix = format!(
-                    "{}\n{layout}#math.equation(block: {}, $",
-                    batch.preamble, item.display
-                );
+                let prefix = if content {
+                    format!("{}\n{layout}", batch.preamble)
+                } else {
+                    format!("{}\n{layout}#math.equation(block: {}, $", batch.preamble, item.display)
+                };
                 world
                     .main
-                    .replace(&format!("{prefix}{}$.body)", item.source));
+                    .replace(&format!("{prefix}{}{}", item.source,
+                        if content { "" } else { "$.body)" }));
                 if batch.target == Target::Svg {
                     let output = typst::compile::<typst_layout::PagedDocument>(&world);
                     let diagnose = |d: &SourceDiagnostic| {
@@ -223,20 +234,46 @@ impl World for MathWorld<'_> {
         if id == self.main.id() {
             return Ok(Bytes::from_string(self.main.text().to_owned()));
         }
-        if matches!(id.root(), VirtualRoot::Package(_)) {
-            return Err(FileError::Other(Some(
-                "MVP supports local imports; download package files into the project first".into(),
-            )));
-        }
         let mut files = self.files.lock().unwrap();
         if let Some(bytes) = files.get(&id) {
             return Ok(bytes.clone());
         }
-        let path = id.vpath().realize(&self.root).map_err(FileError::Realize)?;
+        let root = if let VirtualRoot::Package(spec) = id.root() {
+            let relative = format!("{}/{}/{}", spec.namespace, spec.name, spec.version);
+            package_paths().into_iter().map(|path| path.join(&relative))
+                .find(|path| path.is_dir())
+                .ok_or_else(|| FileError::Other(Some(format!(
+                    "Package {spec} is not installed; populate the Typst package cache or set TYPST_PACKAGE_PATH"
+                ).into())))?
+        } else {
+            self.root.clone()
+        };
+        let path = id.vpath().realize(&root).map_err(FileError::Realize)?;
         let bytes = Bytes::new(std::fs::read(&path).map_err(|e| FileError::from_io(e, &path))?);
         files.insert(id, bytes.clone());
         Ok(bytes)
     }
+}
+
+// Follow Typst's local package layout without performing network I/O in the
+// rendering process. Nix can supply immutable package roots through this path.
+fn package_paths() -> Vec<PathBuf> {
+    let mut paths: Vec<_> = std::env::var_os("TYPST_PACKAGE_PATH")
+        .map(|value| std::env::split_paths(&value).collect())
+        .unwrap_or_default();
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    for (variable, fallback) in [
+        ("XDG_DATA_HOME", ".local/share"),
+        ("XDG_CACHE_HOME", ".cache"),
+    ] {
+        if let Some(root) = std::env::var_os(variable)
+            .map(PathBuf::from)
+            .or_else(|| home.as_ref().map(|path| path.join(fallback)))
+        {
+            paths.push(root.join("typst/packages"));
+        }
+    }
+    paths
 }
 
 impl MathWorld<'_> {
@@ -337,10 +374,15 @@ fn main() -> io::Result<()> {
         };
         let result = match method {
             "initialize" => Ok(
-                json!({"protocolVersion": 1, "targets": ["mathml", "latex", "svg"], "version": env!("CARGO_PKG_VERSION")}),
+                json!({"protocolVersion": 1, "targets": ["mathml", "latex", "svg"],
+                    "methods": ["math/convert", "typst/render"],
+                    "version": env!("CARGO_PKG_VERSION")}),
             ),
             "math/convert" => serde_json::from_value(request["params"].clone())
                 .map(|batch| engine.convert(batch))
+                .map_err(|e| json!({"code": -32602, "message": e.to_string()})),
+            "typst/render" => serde_json::from_value(request["params"].clone())
+                .map(|batch| engine.render(batch))
                 .map_err(|e| json!({"code": -32602, "message": e.to_string()})),
             "shutdown" => Ok(Value::Null),
             _ => Err(json!({"code": -32601, "message": format!("Unknown method: {method}")})),

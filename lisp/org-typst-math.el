@@ -86,9 +86,19 @@ Pending requests are completed by jsonrpc's process sentinel."
   "Convert ITEMS to TARGET (default mathml) in ROOT with PREAMBLE.
 ITEMS is a list of plists with :id, :source and JSON boolean :display.
 Return the helper result, including per-formula diagnostics."
+  (typst-client--convert root preamble items target :math/convert))
+
+(defun typst-client-render (root preamble items)
+  "Render ordinary Typst content ITEMS to SVG, sharing the math helper.
+Unlike `typst-client-convert', :source is Typst markup, not math body.
+ROOT, PREAMBLE, item IDs, foreground and diagnostics use the same contract."
+  (typst-client--convert root preamble items "svg" :typst/render))
+
+(defun typst-client--convert (root preamble items target method)
+  "Send ITEMS to METHOD with ROOT, PREAMBLE and TARGET."
   (let ((connection (typst-client--connection root)))
     (condition-case err
-        (jsonrpc-request connection :math/convert
+        (jsonrpc-request connection method
                          (list :root (expand-file-name root)
                                :preamble preamble :items (vconcat items)
                                :target (or target "mathml"))
@@ -103,6 +113,17 @@ Return the helper result, including per-formula diagnostics."
   "Convert ITEMS asynchronously; call SUCCESS or ERROR once with the result.
 ROOT, PREAMBLE and TARGET have the same meaning as `typst-client-convert'.
 Timeouts and transport failures discard the connection before ERROR runs."
+  (typst-client--convert-async root preamble items success error target :math/convert))
+
+(defun typst-client-render-async (root preamble items success error)
+  "Render ordinary Typst ITEMS to SVG asynchronously.
+Shares the connection, timeout and diagnostic handling of math conversion.
+SUCCESS and ERROR are called at most once.  See `typst-client-render'."
+  (typst-client--convert-async root preamble items success error "svg" :typst/render))
+
+(defun typst-client--convert-async (root preamble items success error target method)
+  "Send asynchronous ITEMS to METHOD with ROOT, PREAMBLE and TARGET.
+Call SUCCESS or ERROR exactly once."
   (let (connection completed)
     (cl-labels
         ((fail (detail)
@@ -116,7 +137,7 @@ Timeouts and transport failures discard the connection before ERROR runs."
           (progn
             (setq connection (typst-client--connection root))
             (jsonrpc-async-request
-             connection :math/convert
+             connection method
              (list :root (expand-file-name root) :preamble preamble
                    :items (vconcat items) :target (or target "mathml"))
              :success-fn (lambda (result)
@@ -285,6 +306,7 @@ This mode does not rewrite the document or enable image preview."
 (add-to-list 'org-export-options-alist '(:typst-math "TYPST_MATH" nil nil t))
 
 (autoload 'org-typst-preview "org-typst-math-preview" nil t)
+(autoload 'org-typst-math-preview-link "org-typst-math-preview")
 (autoload 'org-typst-math-preview-refresh "org-typst-math-preview" nil t)
 (autoload 'org-typst-math-preview-clear "org-typst-math-preview" nil t)
 (autoload 'org-typst-math-preview-diagnostics "org-typst-math-preview" nil t)
