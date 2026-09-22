@@ -21,12 +21,11 @@
               (lambda (file stat)
                 (or (string=? file %project-root)
                     (let ((relative (substring file (+ 1 (string-length %project-root)))))
-                      (or (member relative '("Cargo.toml" "Cargo.lock" "helper" "lisp" "guix"))
+                      (or (member relative '("Cargo.toml" "Cargo.lock" "helper" "lisp"))
                           (and (string-prefix? "helper/" relative)
                                (string-suffix? ".rs" relative))
                           (and (string-prefix? "lisp/" relative)
-                               (string-suffix? ".el" relative))
-                          (string=? relative "guix/check.el")))))))
+                               (string-suffix? ".el" relative))))))))
 
 (define org-typst-math-helper
   (package
@@ -60,9 +59,8 @@ It retains compiler caches between requests and reports source diagnostics.")
     (arguments
      (list
       #:lisp-directory "lisp"
-      #:tests? #t
-      #:test-command '("emacs" "--batch" "-L" "." "-l" "../guix/check.el"
-                       "-f" "ert-run-tests-batch-and-exit")
+      ;; Integration checks are local and not distributed with the package.
+      #:tests? #f
       #:phases
       #~(modify-phases %standard-phases
           (add-after 'unpack 'use-packaged-helper

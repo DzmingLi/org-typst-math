@@ -49,13 +49,12 @@ guix shell -f guix.scm emacs -- emacs
 
 To build without installing, run =guix build -f guix.scm=. The definition uses
 the current checkout, so run these commands again after updating it. Only Rust
-sources, Elisp sources, the Cargo manifests and Guix integration checks enter
+sources, Elisp sources and the Cargo manifests enter
 the source snapshot; local build artifacts are excluded.
 
 Rust dependencies are imported directly from =Cargo.lock= and fetched with
 checksum verification before the offline build. There is no second crate list
-to regenerate. The Emacs package runs =guix/check.el= during its build to check
-helper discovery, HTML/LaTeX export, SVG conversion and error recovery.
+to regenerate.
 Whole-document Typst/PDF export still requires ox-typst separately.
 
 * Development environment and usage
