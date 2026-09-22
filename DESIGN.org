@@ -77,50 +77,10 @@ font-lock matcher；片段判定复用 =org-typst-math-fragment=。显示只改 
 
 * 通用 special block 导出
 
-已实现。=org-typst-math-block-alist= 是默认值为 =nil= 的 defcustom alist，
-由用户配置 Org special block 名到目标环境名的映射。只有表中的块参与转换，
-不预置环境，不自动去前缀。内置原样文本 example 块不受影响。
-
-#+begin_src emacs-lisp
-(setq org-typst-math-block-alist
-      '(("typst-theorem" . "theorem")
-        ("typst-example" . "example")
-        ("typst-proof" . "proof")))
-#+end_src
-
-Typst 导出为同名函数调用；LaTeX 使用映射后的环境名；HTML 使用映射后的
-块类型作为 class。正文仍按 Org 处理，公式继续走现有数学流程。
-导出启用条件沿用 TYPST_MATH 或显式派生 backend。
-
-** Typst 参数透传
-
-ATTR_TYPST 中只有 =:positional= 是特殊键，表示位置参数；其余键全部按原名
-生成 Typst 命名参数。值直接写 Typst 表达式，保留字符串引号、内容括号、
-布尔值、数字及函数调用。不推断类型，不提供 title-arg 或 label-style 等映射配置。
-支持多行 ATTR_TYPST 和重复的位置参数，参数按源码顺序输出。
-
-#+begin_example
-#+ATTR_TYPST: :positional [标题] :supplement [定理] :numbering none
-#+begin_typst-theorem
-正文。
-#+end_typst-theorem
-#+end_example
-
-生成 =#theorem([标题], supplement: [定理], numbering: none)[正文]=。
-用户按所选包直接写 =:title [标题]=、=:name [标题]= 或 =:of [标题]= 等。
-
-NAME 提供 Org 引用目标，默认用 Org 导出 reference 生成后置 Typst 标签，
-与 Org 链接保持一致。需要标签参数的包直接用 =:label <thm:foo>=；此时不再
-生成后置标签，指向该块的 Org 链接使用传入的标签表达式。
-
-** 配置与后端职责
-
-函数定义、定理包导入、样式和计数器由用户 preamble 负责，不增加包白名单
-或支持范围校验。整份文档的 Typst 初始化可以放在文首的 =begin_export typst=
-中；它不会送进公式 helper。TYPST_HEADER 继续用于共享数学宏。
-
-ATTR_TYPST 仅用于 Typst；LaTeX、HTML 各自沿用 ATTR_LATEX、ATTR_HTML。
-HTML 定理编号和跨后端标题自动同步尚未实现。
+块名到 Typst 函数调用、块头参数解析、标签及引用处理均归 ox-typst。
+实现位于 [[https://github.com/DzmingLi/ox-typst][ox-typst fork]]，尚未合入上游。
+org-typst-math 的 Typst 派生后端仅覆盖数学片段，继承 ox-typst 的块和链接导出。
+普通块无需 TYPST_MATH 开关；HTML、LaTeX 使用 Org 原生导出逻辑。
 
 * 内置 SVG 预览
 

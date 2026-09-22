@@ -17,87 +17,6 @@
 (declare-function org-typst-math--enabled-p "org-typst-math" (value))
 (declare-function org-typst-latex-fragment "ox-typst" (fragment contents info))
 
-(defvar org-typst-math-block-alist)
-(declare-function org-typst-special-block "ox-typst" (block contents info))
-(declare-function org-typst-link "ox-typst" (link contents info))
-(declare-function org-typst--as-string "ox-typst" (value))
-
-(defun org-typst-math--block-name (block)
-  "Return the configured export name of BLOCK."
-  (cdr (assoc (org-element-property :type block) org-typst-math-block-alist)))
-
-(defun org-typst-math--block-arguments (block)
-  "Read BLOCK's ATTR_TYPST pairs, retaining raw Typst expressions.
-Only top-level :keys separate arguments; strings and brackets retain colons."
-  (let* ((text (mapconcat #'identity (org-element-property :attr_typst block) " "))
-         (length (length text)) (i 0) (depth 0) quoted key start pairs)
-    (while (< i length)
-      (let ((char (aref text i)))
-        (cond
-         ((and quoted (= char ?\\)) (setq i (1+ i)))
-         ((= char ?\") (setq quoted (not quoted)))
-         (quoted)
-         ((memq char '(?\( ?\[ ?\{)) (cl-incf depth))
-         ((memq char '(?\) ?\] ?\})) (cl-decf depth))
-         ((and (= depth 0) (= char ?:)
-               (or (= i 0) (memq (aref text (1- i)) '(?\s ?\t ?\n)))
-               (string-match "\\`:\\([-[:alnum:]_]+\\)\\(?:[ \t\n]+\\|\\'\\)"
-                             (substring text i)))
-          (when key (push (cons key (string-trim (substring text start i))) pairs))
-          (setq key (match-string 1 (substring text i))
-                start (+ i (match-end 0)) i (1- start)))))
-      (cl-incf i))
-    (when key (push (cons key (string-trim (substring text start))) pairs))
-    (nreverse pairs)))
-
-(defun org-typst-math--renamed-block (block contents info translator)
-  "Call TRANSLATOR on BLOCK with its mapped name, CONTENTS and INFO."
-  (let ((original (org-element-property :type block)))
-    (unwind-protect
-        (progn
-          (when-let* ((name (org-typst-math--block-name block)))
-            (org-element-put-property block :type name))
-          (funcall translator block contents info))
-      (org-element-put-property block :type original))))
-
-(defun org-typst-math--html-block (block contents info)
-  "Export mapped BLOCK with CONTENTS and INFO through Org HTML."
-  (org-typst-math--renamed-block block contents info #'org-html-special-block))
-
-(defun org-typst-math--latex-block (block contents info)
-  "Export mapped BLOCK with CONTENTS and INFO through Org LaTeX."
-  (org-typst-math--renamed-block block contents info #'org-latex-special-block))
-
-(defun org-typst-math--block-label (block info)
-  "Return the Typst label expression for BLOCK using export INFO."
-  (or (cdr (assoc "label" (org-typst-math--block-arguments block)))
-      (format "label(%s)" (org-typst--as-string (org-export-get-reference block info)))))
-
-(defun org-typst-math--typst-block (block contents info)
-  "Export mapped BLOCK as a function call with CONTENTS and INFO."
-  (if-let* ((name (org-typst-math--block-name block)))
-      (let* ((pairs (org-typst-math--block-arguments block))
-             (args (mapconcat (lambda (pair)
-                                (if (equal (car pair) "positional") (cdr pair)
-                                  (concat (car pair) ": " (cdr pair))))
-                              pairs ", ")))
-        (concat "#" name (unless (string-empty-p args) (concat "(" args ")"))
-                "[\n" contents "]"
-                (when (and (org-element-property :name block) (not (assoc "label" pairs)))
-                  (concat " #" (org-typst-math--block-label block info))) "\n"))
-    (org-typst-special-block block contents info)))
-
-(defun org-typst-math--typst-link (link contents info)
-  "Resolve LINK to mapped blocks using their label expressions and INFO."
-  (let ((target (when (equal (org-element-property :type link) "fuzzy")
-                  (org-export-resolve-fuzzy-link link info))))
-    (if (and (org-element-type-p target 'special-block)
-             (org-typst-math--block-name target))
-        (let ((label (org-typst-math--block-label target info)))
-          (if contents (format "#link(%s)[%s]" label contents)
-            (format "#ref(%s)" label)))
-      (org-typst-link link contents info))))
-
 (defun org-typst-math--route-export (original backend &optional subtree visible body ext)
   "Route ORIGINAL export of BACKEND when Typst math is explicitly enabled.
 SUBTREE, VISIBLE, BODY and EXT retain their Org meanings."
@@ -249,23 +168,19 @@ CONTENTS and INFO are the standard translator arguments."
   :options-alist '((:typst-header "TYPST_HEADER" nil nil newline)
                    (:typst-math-css nil nil nil)
                    (:html-mathjax-template nil nil ""))
-  :translate-alist '((latex-fragment . org-typst-math--html-fragment)
-                     (special-block . org-typst-math--html-block))
+  :translate-alist '((latex-fragment . org-typst-math--html-fragment))
   :filters-alist '((:filter-parse-tree . org-typst-math--prepare)
                    (:filter-body . org-typst-math--html-body)))
 
 (org-export-define-derived-backend 'typst-math-latex 'latex
   :options-alist '((:typst-header "TYPST_HEADER" nil nil newline))
   :translate-alist '((latex-fragment . org-typst-math--latex-fragment)
-                     (template . org-typst-math--latex-template)
-                     (special-block . org-typst-math--latex-block))
+                     (template . org-typst-math--latex-template))
   :filters-alist '((:filter-parse-tree . org-typst-math--prepare)))
 
 (with-eval-after-load 'ox-typst
   (org-export-define-derived-backend 'typst-math-typst 'typst
-    :translate-alist '((latex-fragment . org-typst-math--typst-fragment)
-                       (special-block . org-typst-math--typst-block)
-                       (link . org-typst-math--typst-link))))
+    :translate-alist '((latex-fragment . org-typst-math--typst-fragment))))
 
 (provide 'org-typst-math-export)
 ;;; org-typst-math-export.el ends here

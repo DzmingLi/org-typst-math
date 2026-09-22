@@ -3,33 +3,32 @@
 #+TYPST_HEADER: #let sq(x) = $#x^2$
 #+LATEX_HEADER: \usepackage{amsthm}
 #+LATEX_HEADER: \newtheorem{theorem}{Theorem}
-#+LATEX_HEADER: \newtheorem{example}{Example}
+#+LATEX_HEADER: \newtheorem{mathexample}{Example}
 #+OPTIONS: toc:nil
 
 #+begin_export typst
 #import "@preview/theorion:0.6.0": *
 #import cosmos.simple: *
+#let mathexample = example
 #show: show-theorion
 #+end_export
 
 * Statements
 
 #+NAME: square
-#+ATTR_TYPST: :title [Nonnegative squares]
 #+ATTR_LATEX: :options [Nonnegative squares]
-#+begin_typst-theorem
+#+begin_theorem :title [Nonnegative squares]
 For real $x$, we have $sq(x) >= 0$.
-#+end_typst-theorem
+#+end_theorem
 
-#+begin_typst-proof
+#+begin_proof
 A square is nonnegative.
-#+end_typst-proof
+#+end_proof
 
-#+ATTR_TYPST: :positional [A concrete case]
 #+ATTR_LATEX: :options [A concrete case]
-#+begin_typst-example
+#+begin_mathexample :positional [A concrete case]
 For example, $sq(2) = 4$.
-#+end_typst-example
+#+end_mathexample
 
 See [[square][the statement above]].
 

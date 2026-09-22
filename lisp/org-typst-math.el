@@ -16,12 +16,6 @@
 
 (defgroup org-typst-math nil "Typst mathematics in Org." :group 'org)
 
-(defcustom org-typst-math-block-alist nil
-  "Map Org special block names to Typst functions and export environments.
-Only listed blocks are converted.  No prefixes are stripped automatically."
-  :type '(alist :key-type string :value-type string)
-  :group 'org-typst-math)
-
 (defcustom org-typst-math-entities
   '(;; Lowercase Greek letters, as spelled in Typst math.
     ("alpha" . "α") ("beta" . "β") ("gamma" . "γ") ("delta" . "δ")

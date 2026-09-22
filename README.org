@@ -154,51 +154,14 @@ them automatically. The client also provides asynchronous conversion for preview
 
 * Math environments and custom blocks
 
-Configure aliases with =M-x customize-variable RET org-typst-math-block-alist=,
-or set them directly:
+Special block functions, header parameters, labels, and references belong to
+ox-typst. This package inherits that behavior and only handles math fragments.
+They do not require =TYPST_MATH= or loading org-typst-math.
 
-#+begin_src emacs-lisp
-(setq org-typst-math-block-alist
-      '(("typst-theorem" . "theorem")
-        ("typst-example" . "example")
-        ("typst-proof" . "proof")))
-#+end_src
-
-The default mapping is empty. Only configured special blocks are converted,
-and arbitrary environment names can be mapped. There is no automatic prefix
-rule. The standard =begin_example= block remains a verbatim example block.
-
-#+begin_example
-#+NAME: my-theorem
-#+ATTR_TYPST: :title [A theorem] :numbering none
-#+ATTR_LATEX: :options [A theorem]
-#+begin_typst-theorem
-For real $x$, $x^2 >= 0$.
-#+end_typst-theorem
-
-See [[my-theorem][the theorem]].
-#+end_example
-
-Typst output is =#theorem(title: [A theorem], numbering: none)[...]=.
-=:positional= supplies positional arguments; all other keys retain their names.
-Values are raw Typst expressions, such as =:name "Title"=,
-=:positional [Title]=, =:outlined false=, or =:fill rgb("#fff")=.
-Positional arguments can be repeated, and attributes can span multiple
-ATTR_TYPST lines.
-
-By default, NAME produces a trailing label matching Org links. To pass a label
-as an argument instead, use =:label <thm:one>= while keeping NAME as the Org
-link target.
-
-LaTeX uses the mapped environment name and ATTR_LATEX; HTML uses the mapped
-class and ATTR_HTML. Typst arguments are not translated into HTML or LaTeX
-attributes. HTML theorem numbering is not generated automatically.
-
-See [[file:examples/blocks.org][blocks.org]] for a complete example. Its theorion setup lives in a
-=begin_export typst= block at the top of the document. This setup applies only
-to whole-document Typst export and is not passed to the math helper.
-After configuring the aliases above, export the example through the standard
-Org menu. Math macros still belong in TYPST_HEADER.
+Use [[https://github.com/DzmingLi/ox-typst][the ox-typst fork]] for the block examples in
+[[file:examples/blocks.org][blocks.org]]. These additions are not yet in upstream ox-typst;
+versions without them only export special block contents.
+HTML and LaTeX blocks use Org's native exporters.
 
 * Built-in previews and org-fragtog-plus
 
