@@ -14,6 +14,19 @@
 为避免依赖 Org 的间接加载，在 org-fragtog-plus 中补上 org-element、subr-x 和 seq 的显式 require。
 包头声明 Emacs 30.2；依赖 Org 的包声明 Org 9.7.11。Nix 打包直接读取包头，更低的候选版本不作为安装下限。
 
+* Guix 打包验证
+
+2026-09-23：Guix =a5a45d1822000c962480cc3246542560ce2f6693=。
+
+- =guix.scm= 在真实 Guix 中求值通过，两个包均可展开为构建计划。
+- =cargo-inputs-from-lockfile= 从 Cargo.lock 导入 378 个 crate；helper 使用 Rust 1.93。
+- 验证了源码筛选以及打包阶段对 helper 绝对路径的替换。
+- 使用 Guix 的 Emacs 30.2 和 Org 9.8.3，3 项 Guix 集成检查通过：
+  helper 路径、HTML/LaTeX 导出、SVG 转换及错误恢复。
+- 上述集成检查使用已有本地 helper，并非 Guix 构建产物。
+- 本机 Guix daemon 不可用（Connection refused），未完成 =guix build -f guix.scm=
+  的完整沙箱构建。Rust 构建依赖是否全部可在 Guix 中构建尚待验证。
+
 * 源码边界（不是已验证的最低支持版本）
 
 | 包 | 候选版本 | 依据 |

@@ -8,6 +8,8 @@ Requires Emacs 30.2+ and Org 9.7.11+; no compatibility layer is included.
 
 * Installation
 
+** Nix
+
 #+begin_src sh
 git clone https://github.com/DzmingLi/org-typst-math.git
 cd org-typst-math
@@ -20,6 +22,41 @@ with =package-install-file= as described below. When the helper is on Emacs's
 PATH, there is no need to set =typst-client-command=.
 You can also build the helper with =nix build=, or run =cargo build= in the
 development shell.
+
+** Guix
+
+Use a recent Guix checkout that provides =cargo-inputs-from-lockfile= and
+=rust-1.93= (update with =guix pull= if necessary). From this repository:
+
+#+begin_src sh
+guix package -f guix.scm
+#+end_src
+
+This installs =emacs-org-typst-math=, Org, and the matching Rust helper as a
+runtime dependency. The packaged Elisp uses the helper's absolute store path,
+so no PATH or =typst-client-command= configuration is needed. In your
+Guix-managed Emacs configuration, load the package:
+
+#+begin_src emacs-lisp
+(require 'org-typst-math)
+#+end_src
+
+To try it without changing your profile, including a Guix-managed Emacs:
+
+#+begin_src sh
+guix shell -f guix.scm emacs -- emacs
+#+end_src
+
+To build without installing, run =guix build -f guix.scm=. The definition uses
+the current checkout, so run these commands again after updating it. Only Rust
+sources, Elisp sources, the Cargo manifests and Guix integration checks enter
+the source snapshot; local build artifacts are excluded.
+
+Rust dependencies are imported directly from =Cargo.lock= and fetched with
+checksum verification before the offline build. There is no second crate list
+to regenerate. The Emacs package runs =guix/check.el= during its build to check
+helper discovery, HTML/LaTeX export, SVG conversion and error recovery.
+Whole-document Typst/PDF export still requires ox-typst separately.
 
 * Development environment and usage
 
