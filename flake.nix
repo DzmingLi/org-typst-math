@@ -2,20 +2,18 @@
   description = "Org mathematics with Typst and a persistent Rust helper";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  inputs.cargo2nix.url = "github:cargo2nix/cargo2nix";
-  inputs.cargo2nix.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs =
     {
       self,
       nixpkgs,
-      cargo2nix,
       ...
     }:
     let
       systems = [
         "x86_64-linux"
         "aarch64-linux"
+        "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in
@@ -23,40 +21,11 @@
       packages = forAllSystems (
         system:
         let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ cargo2nix.overlays.default ];
-          };
-          rustToolchain = pkgs.symlinkJoin {
-            name = "rust-toolchain";
-            inherit (pkgs.rustc) version;
-            paths = [
-              pkgs.rustc
-              pkgs.cargo
-            ];
-          };
-          rustPkgs = pkgs.rustBuilder.makePackageSet {
-            inherit rustToolchain;
-            packageFun = import ./Cargo.nix;
-            workspaceSrc = pkgs.lib.fileset.toSource {
-              root = ./.;
-              fileset = pkgs.lib.fileset.unions [
-                ./Cargo.toml
-                ./Cargo.lock
-                ./helper
-              ];
-            };
-          };
+          pkgs = import nixpkgs { inherit system; };
+          cargoNix = pkgs.callPackage ./Cargo.nix { };
         in
         {
-          default = rustPkgs.workspace.org-typst-math-helper { };
-          cargo2nix =
-            (pkgs.rustBuilder.makePackageSet {
-              inherit rustToolchain;
-              packageFun = import "${cargo2nix}/Cargo.nix";
-              workspaceSrc = cargo2nix;
-            }).workspace.cargo2nix
-              { };
+          default = cargoNix.rootCrate.build;
           elisp =
             pkgs.runCommand "org-typst-elisp-packages"
               {
@@ -92,7 +61,7 @@
               rustc
               rustfmt
               clippy
-              self.packages.${system}.cargo2nix
+              crate2nix
               ((emacsPackagesFor emacs).emacsWithPackages (epkgs: [ epkgs.ox-typst ]))
               typst
               git

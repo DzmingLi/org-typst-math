@@ -60,17 +60,17 @@ Whole-document Typst/PDF export still requires ox-typst separately.
 * Development environment and usage
 
 =flake.nix= provides the development environment, pinned by =flake.lock=.
-The Nix packages support x86_64-linux and aarch64-linux.
+The Nix packages support x86_64-linux, aarch64-linux, and aarch64-darwin.
 It includes the Rust toolchain, Emacs 31, Org, ox-typst, and the Typst CLI.
 Install TeX separately for LaTeX-to-PDF export. The helper links directly to
 Typst's Rust libraries and does not invoke the CLI.
 
-The helper is built with [[https://github.com/cargo2nix/cargo2nix][cargo2nix]], with a separate derivation for each crate.
+The helper is built with [[https://github.com/nix-community/crate2nix][crate2nix]], with a separate derivation for each crate.
 After changing Cargo dependencies, regenerate and commit =Cargo.nix= alongside
 =Cargo.lock=:
 
 #+begin_src sh
-nix develop -c cargo2nix --locked --overwrite
+nix develop -c crate2nix generate
 nix fmt -- Cargo.nix
 #+end_src
 
