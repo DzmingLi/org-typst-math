@@ -24,9 +24,19 @@ development shell.
 * Development environment and usage
 
 =flake.nix= provides the development environment, pinned by =flake.lock=.
+The Nix packages support x86_64-linux and aarch64-linux.
 It includes the Rust toolchain, Emacs 31, Org, ox-typst, and the Typst CLI.
 Install TeX separately for LaTeX-to-PDF export. The helper links directly to
 Typst's Rust libraries and does not invoke the CLI.
+
+The helper is built with [[https://github.com/cargo2nix/cargo2nix][cargo2nix]], with a separate derivation for each crate.
+After changing Cargo dependencies, regenerate and commit =Cargo.nix= alongside
+=Cargo.lock=:
+
+#+begin_src sh
+nix develop -c cargo2nix --locked --overwrite
+nix fmt -- Cargo.nix
+#+end_src
 
 Use the standard Org export menu in an example buffer:
 
@@ -101,9 +111,9 @@ $alpha + beta = gamma$   ; displays as α + β = γ
 
 Greek letters and a few common operators (such as =integral=, =sum=,
 =dif=, =compose=, =dot=, =eq.not=, =tack.r=, =in=, =forall=, =exists=,
-and =times=) are recognized by default. Customize
+=times=, and =infinity=) are recognized by default. Customize
 =M-x customize-variable RET org-typst-math-entities= to add more symbols, for
-example =("infinity" . "∞")= or =("partial" . "∂")=, or set it to nil to
+example =("partial" . "∂")=, or set it to nil to
 prettify nothing. =M-x org-toggle-pretty-entities= and
 =#+STARTUP: entitiespretty= work as usual, and compositions are removed when
 =org-typst-math-mode= is disabled.
@@ -220,7 +230,14 @@ Do not enable both toggling modes in the same buffer.
 #+end_src
 
 Entering a formula reveals its source; leaving it restores the image, requesting
-a new SVG when needed. =org-fragtog-plus-delay= sets the idle delay before
+a new SVG when needed. Automatic requests render only missing previews and keep
+existing images. Typing elsewhere while a request is running does not discard
+its results; editing a formula invalidates only that formula's pending image.
+Automatic requests are coalesced on the next timer turn, without a fixed idle
+delay. Unchanged SVG output reuses the existing image object when scale and
+layout are unchanged. Clearing previews also cancels scheduled refreshes.
+Manual refresh still renders all formulas, including changes to imported macros.
+=org-fragtog-plus-delay= sets the idle delay before
 revealing source, in seconds (default 0). Each render automatically scales
 the helper's 12pt output to the current frame's default face size.
 Refresh previews after changing the default font size.

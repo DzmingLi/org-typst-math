@@ -41,14 +41,13 @@ Only listed blocks are converted.  No prefixes are stripped automatically."
     ("integral" . "∫") ("sum" . "∑") ("dif" . "d")
     ("compose" . "∘") ("dot" . "⋅") ("eq.not" . "≠")
     ("tack.r" . "⊢") ("in" . "∈") ("forall" . "∀")
-    ("exists" . "∃") ("times" . "×"))
+    ("exists" . "∃") ("times" . "×") ("infinity" . "∞"))
   "Alist mapping Typst math identifiers to Unicode replacements.
 Used together with `org-pretty-entities' and `org-typst-math-mode': when
 both are enabled, these identifiers are displayed as Unicode characters
 inside Typst math fragments.  This affects display only; the source text,
 previews, and exports keep the original Typst identifiers.  Add entries to
-display further Typst symbols; for instance, map the identifier infinity
-to the infinity sign."
+display further Typst symbols; for instance, map partial to ∂."
   :type '(alist :key-type string :value-type string)
   :group 'org-typst-math)
 
