@@ -209,6 +209,23 @@ N is the delimiter length in characters.  Return nil for non-math LaTeX."
 
 (defvar org-typst-math-mode)
 
+(defcustom org-typst-math-pretty-fractions t
+  "Display slash fractions with stacked text glyphs in graphical Emacs.
+This experimental display also requires `org-typst-math-mode' and
+`org-pretty-entities'.  Grouped nested fractions are supported.  Entering
+a fraction reveals its entire source; leaving it restores the stacked form.
+Subscript and superscript display follows
+`org-pretty-entities-include-sub-superscripts' independently of this option.
+After changing this with `setq', run `font-lock-flush' in existing buffers."
+  :type 'boolean
+  :safe #'booleanp
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (dolist (buffer (buffer-list))
+           (with-current-buffer buffer
+             (when (bound-and-true-p org-typst-math-mode)
+               (font-lock-flush))))))
+
 (defconst org-typst-math--identifier-re
   "[[:alpha:]][[:alnum:]]*\\(?:\\.[[:alpha:]][[:alnum:]]*\\)*"
   "Regexp matching a candidate Typst math identifier and its variants.")
@@ -302,8 +319,39 @@ An immediately following argument list belongs to an identifier operand."
             end))))
     (scan-error nil)))
 
+(defvar-local org-typst-math--script-cursor nil
+  "Marker recording the editing position before redisplay fontification.")
+
+(defvar-local org-typst-math--revealed-script-markers nil
+  "Script marker positions temporarily revealed next to point.")
+
+(defun org-typst-math--reveal-script-markers (position)
+  "Reveal script markers immediately before or after POSITION."
+  (with-silent-modifications
+    (dolist (marker org-typst-math--revealed-script-markers)
+      (when (and (marker-position marker)
+                 (<= (point-min) marker) (< marker (point-max))
+                 (get-text-property marker 'org-typst-math-script-marker))
+        (put-text-property marker (1+ marker) 'invisible 'org-typst-math-script))
+      (set-marker marker nil))
+    (setq org-typst-math--revealed-script-markers nil)
+    (when position
+      (dolist (pos (list (1- position) position))
+        (when (and (<= (point-min) pos) (< pos (point-max))
+                   (get-text-property pos 'org-typst-math-script-marker))
+          (remove-text-properties pos (1+ pos) '(invisible nil))
+          (push (copy-marker pos) org-typst-math--revealed-script-markers))))))
+
+(defun org-typst-math--script-post-command ()
+  "Keep script syntax visible when point touches either side of its marker."
+  (when org-typst-math-mode
+    (unless (markerp org-typst-math--script-cursor)
+      (setq org-typst-math--script-cursor (make-marker)))
+    (set-marker org-typst-math--script-cursor (point))
+    (org-typst-math--reveal-script-markers (point))))
+
 (defun org-typst-math--fontify-scripts (limit)
-  "Display Typst script operands before LIMIT, keeping their markers visible.
+  "Display Typst script operands before LIMIT, revealing markers near point.
 Follow Org's pretty-entity switches and reuse `org-script-display' so Org's
 unfontifier also removes these display properties after edits."
   (when (and org-typst-math-mode org-pretty-entities
@@ -324,17 +372,42 @@ unfontifier also removes these display properties after edits."
                  ((eq (char-after) ?\")
                   (goto-char (or (org-typst-math--script-end) (point-max))))
                  ((memq (char-after) '(?_ ?^))
-                  (let ((display (nth (if (eq (char-after) ?_) 0 1)
+                  (let ((marker (point))
+                        (display (nth (if (eq (char-after) ?_) 0 1)
                                       org-script-display)))
                     (forward-char)
                     (save-excursion
                       (skip-chars-forward " \t\n")
                       (when-let* ((end (org-typst-math--script-end)))
+                        (add-text-properties
+                         marker (1+ marker)
+                         '(org-typst-math-script-marker t
+                           invisible org-typst-math-script))
                         (put-text-property (point) end 'display display)))))
                  (t (forward-char)))))
             (put-text-property (point-min) (point-max) 'font-lock-multiline t))
+          (org-typst-math--reveal-script-markers
+           (when (markerp org-typst-math--script-cursor)
+             (marker-position org-typst-math--script-cursor)))
           (throw 'match t)))
       nil)))
+
+(defun org-typst-math--fontify-fractions (limit)
+  "Apply the optional text fraction display before font-lock LIMIT."
+  (if (and org-typst-math-mode org-pretty-entities
+           org-typst-math-pretty-fractions (display-graphic-p))
+      (progn
+        (require 'org-typst-math-fractions)
+        (org-typst-math-fractions--setup)
+        (org-typst-math-fractions--refresh (point) limit))
+    (when (fboundp 'org-typst-math-fractions--teardown)
+      (org-typst-math-fractions--teardown)))
+  (goto-char limit)
+  nil)
+
+(declare-function org-typst-math-fractions--setup "org-typst-math-fractions")
+(declare-function org-typst-math-fractions--refresh "org-typst-math-fractions" (beg end))
+(declare-function org-typst-math-fractions--teardown "org-typst-math-fractions")
 
 (defun org-typst-math--font-lock-keywords ()
   "Install Typst entity and script matchers into Org's font-lock keywords."
@@ -345,7 +418,8 @@ unfontifier also removes these display properties after edits."
                             keyword))
                         org-font-lock-extra-keywords)
                 '(org-typst-math--fontify-entities
-                  org-typst-math--fontify-scripts))))
+                  org-typst-math--fontify-scripts
+                  org-typst-math--fontify-fractions))))
 
 (add-hook 'org-font-lock-set-keywords-hook #'org-typst-math--font-lock-keywords)
 
@@ -369,8 +443,22 @@ This mode does not rewrite the document or enable image preview."
     (setq org-typst-math-mode nil)
     (user-error "Typst math mode requires Org"))
    (org-typst-math-mode
+    (add-to-invisibility-spec 'org-typst-math-script)
+    (setq-local font-lock-extra-managed-props
+                (cons 'org-typst-math-script-marker
+                      (remq 'org-typst-math-script-marker font-lock-extra-managed-props)))
+    (add-hook 'post-command-hook #'org-typst-math--script-post-command nil t)
+    (org-typst-math--script-post-command)
     (when org-pretty-entities (font-lock-flush)))
-   (t (org-typst-math--clear-pretty-entities))))
+   (t
+    (when (fboundp 'org-typst-math-fractions--teardown)
+      (org-typst-math-fractions--teardown))
+    (remove-hook 'post-command-hook #'org-typst-math--script-post-command t)
+    (org-typst-math--reveal-script-markers nil)
+    (when (markerp org-typst-math--script-cursor)
+      (set-marker org-typst-math--script-cursor nil))
+    (remove-from-invisibility-spec 'org-typst-math-script)
+    (org-typst-math--clear-pretty-entities))))
 
 (defun org-typst-math--setup ()
   "Enable the editing mode when the current Org file declares Typst math."

@@ -158,17 +158,47 @@ When =org-pretty-entities-include-sub-superscripts= is also enabled, math
 script operands are displayed smaller and raised or lowered, using Org's
 script display properties. For example, =x_i^2= lowers =i= and raises =2=;
 =sum_(k=1)^n= lowers the parenthesized group and raises =n=. The =_= and =^=
-markers and parentheses remain visible and editable. Simple identifiers,
+markers are hidden until point is immediately before or after them; moving
+away hides them again. Parentheses remain visible. Simple identifiers,
 numbers, strings, parenthesized groups, and calls such as =x^sqrt(2)= are
 supported; incomplete groups are left unchanged. This is source display,
 not full mathematical typesetting. Outside math fragments, Org's usual
 subscript and superscript display still applies.
+
+** Experimental text fractions
+
+The default =org-typst-math-pretty-fractions= value of =t= displays slash
+fractions with native Emacs text glyphs. This requires graphical Emacs,
+=org-typst-math-mode=, and =org-pretty-entities=. Set the fraction option to
+=nil= to disable it independently. For example:
+
+#+begin_src emacs-lisp
+(setq org-pretty-entities t
+      org-pretty-entities-include-sub-superscripts t
+      org-typst-math-pretty-fractions t)
+#+end_src
+
+=1/n^2=, =(a_i + b^2)/(c_j + d)=, and grouped nested fractions such as
+=(1/(n^2 + 1))/(a_i/b_j)= are supported. Point entering any part of a fraction
+reveals that *entire outer fraction* as editable slash source; leaving it
+restores the stacked display. Subscripts and superscripts, including those
+inside fractions, independently follow
+=org-pretty-entities-include-sub-superscripts=.
+
+This changes only the display; copying, saving and exporting retain the
+original text. No image or helper process is used. The prototype uses one
+font size within a fraction, so nested fractions make lines taller. It does
+not implement Typst's full layout: chained divisions such as =a/b/c=,
+=frac(...)= calls, multiline operands and unsupported font glyphs stay as
+source. Use parentheses to make division nesting explicit. After changing
+the option with =setq= in an existing buffer, run =M-x font-lock-flush=.
 
 * Packages and processes
 
 | Package or module | Files | Dependencies |
 |-------------------+-------+--------------|
 | org-typst-math | lisp/org-typst-math.el, lisp/org-typst-math-export.el | Org, Emacs jsonrpc |
+| Text fraction display | lisp/org-typst-math-fractions.el | Included in org-typst-math |
 
 | Built-in preview module | lisp/org-typst-math-preview.el | Included in org-typst-math |
 
