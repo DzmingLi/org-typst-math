@@ -175,7 +175,7 @@ Call SUCCESS or ERROR exactly once."
     ("Rho" . "Ρ") ("Sigma" . "Σ") ("Tau" . "Τ") ("Upsilon" . "Υ")
     ("Phi" . "Φ") ("Chi" . "Χ") ("Psi" . "Ψ") ("Omega" . "Ω")
     ;; Common operators and relations.
-    ("integral" . "∫") ("sum" . "∑") ("dif" . "d")
+    ("integral" . "∫") ("sum" . "∑") ("sqrt" . "√") ("dif" . "d")
     ("compose" . "∘") ("dot" . "⋅") ("eq.not" . "≠")
     ("tack.r" . "⊢") ("in" . "∈") ("forall" . "∀")
     ("exists" . "∃") ("times" . "×") ("infinity" . "∞"))
