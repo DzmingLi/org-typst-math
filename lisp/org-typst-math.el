@@ -176,7 +176,7 @@ Call SUCCESS or ERROR exactly once."
     ("Phi" . "Φ") ("Chi" . "Χ") ("Psi" . "Ψ") ("Omega" . "Ω")
     ;; Common operators and relations.
     ("integral" . "∫") ("sum" . "∑") ("sqrt" . "√") ("dif" . "d")
-    ("compose" . "∘") ("dot" . "⋅") ("eq.not" . "≠")
+    ("compose" . "∘") ("dot" . "⋅") ("dots.c" . "⋯") ("eq.not" . "≠")
     ("tack.r" . "⊢") ("in" . "∈") ("forall" . "∀")
     ("exists" . "∃") ("times" . "×") ("infinity" . "∞"))
   "Alist mapping Typst math identifiers to Unicode replacements.
