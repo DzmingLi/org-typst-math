@@ -263,11 +263,89 @@ A font-lock matcher that follows `org-pretty-entities' and only runs in
                 (throw 'match t))))))
       nil)))
 
+(defun org-typst-math--raise-scripts (limit)
+  "Apply Org's script fontification outside Typst math before LIMIT."
+  (if (not org-typst-math-mode)
+      (org-raise-scripts limit)
+    (catch 'match
+      (dolist (range (org-typst-math--math-ranges))
+        (when (< (point) (min limit (car range)))
+          (when (org-raise-scripts (min limit (car range)))
+            (throw 'match t))
+          (goto-char (min limit (car range))))
+        (when (and (< (point) limit) (< (point) (cdr range)))
+          (goto-char (min limit (cdr range)))))
+      (and (< (point) limit) (org-raise-scripts limit)))))
+
+(defconst org-typst-math--script-syntax-table
+  (let ((table (make-syntax-table)))
+    (modify-syntax-entry ?_ "." table)
+    (modify-syntax-entry ?^ "." table)
+    (modify-syntax-entry ?/ ". 124b" table)
+    (modify-syntax-entry ?* ". 23n" table)
+    (modify-syntax-entry ?\n "> b" table)
+    table)
+  "Syntax used to skip strings, comments and balanced math groups.")
+
+(defun org-typst-math--script-end ()
+  "Return the end of a simple Typst script operand at point, or nil.
+Recognize identifiers, numbers, strings and balanced parenthesized groups.
+An immediately following argument list belongs to an identifier operand."
+  (condition-case nil
+      (cond
+       ((memq (char-after) '(?\( ?\")) (scan-sexps (point) 1))
+       ((looking-at (concat org-typst-math--identifier-re
+                            "\\|[0-9]+\\(?:\\.[0-9]+\\)?"))
+        (let ((end (match-end 0)))
+          (if (eq (char-after end) ?\()
+              (scan-sexps end 1)
+            end))))
+    (scan-error nil)))
+
+(defun org-typst-math--fontify-scripts (limit)
+  "Display Typst script operands before LIMIT, keeping their markers visible.
+Follow Org's pretty-entity switches and reuse `org-script-display' so Org's
+unfontifier also removes these display properties after edits."
+  (when (and org-typst-math-mode org-pretty-entities
+             org-pretty-entities-include-sub-superscripts)
+    (catch 'match
+      (dolist (range (org-typst-math--math-ranges))
+        (when (and (< (point) (cdr range)) (< (car range) limit))
+          (save-restriction
+            (narrow-to-region (car range) (cdr range))
+            (goto-char (point-min))
+            (with-syntax-table org-typst-math--script-syntax-table
+              (while (< (point) (point-max))
+                (forward-comment (point-max))
+                (cond
+                 ((eobp))
+                 ((eq (char-after) ?\\)
+                  (forward-char (min 2 (- (point-max) (point)))))
+                 ((eq (char-after) ?\")
+                  (goto-char (or (org-typst-math--script-end) (point-max))))
+                 ((memq (char-after) '(?_ ?^))
+                  (let ((display (nth (if (eq (char-after) ?_) 0 1)
+                                      org-script-display)))
+                    (forward-char)
+                    (save-excursion
+                      (skip-chars-forward " \t\n")
+                      (when-let* ((end (org-typst-math--script-end)))
+                        (put-text-property (point) end 'display display)))))
+                 (t (forward-char)))))
+            (put-text-property (point-min) (point-max) 'font-lock-multiline t))
+          (throw 'match t)))
+      nil)))
+
 (defun org-typst-math--font-lock-keywords ()
-  "Install the Typst entity matcher into Org's font-lock keywords."
+  "Install Typst entity and script matchers into Org's font-lock keywords."
   (setq org-font-lock-extra-keywords
-        (append org-font-lock-extra-keywords
-                '(org-typst-math--fontify-entities))))
+        (append (mapcar (lambda (keyword)
+                          (if (equal keyword '(org-raise-scripts))
+                              '(org-typst-math--raise-scripts)
+                            keyword))
+                        org-font-lock-extra-keywords)
+                '(org-typst-math--fontify-entities
+                  org-typst-math--fontify-scripts))))
 
 (add-hook 'org-font-lock-set-keywords-hook #'org-typst-math--font-lock-keywords)
 

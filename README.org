@@ -154,6 +154,16 @@ prettify nothing. =M-x org-toggle-pretty-entities= and
 =#+STARTUP: entitiespretty= work as usual, and compositions are removed when
 =org-typst-math-mode= is disabled.
 
+When =org-pretty-entities-include-sub-superscripts= is also enabled, math
+script operands are displayed smaller and raised or lowered, using Org's
+script display properties. For example, =x_i^2= lowers =i= and raises =2=;
+=sum_(k=1)^n= lowers the parenthesized group and raises =n=. The =_= and =^=
+markers and parentheses remain visible and editable. Simple identifiers,
+numbers, strings, parenthesized groups, and calls such as =x^sqrt(2)= are
+supported; incomplete groups are left unchanged. This is source display,
+not full mathematical typesetting. Outside math fragments, Org's usual
+subscript and superscript display still applies.
+
 * Packages and processes
 
 | Package or module | Files | Dependencies |
